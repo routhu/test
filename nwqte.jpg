@@ -1,24 +1,66 @@
-filterParams: {
-    lookup: async (keyword) => {
-        try {
-            console.log('Filter invoked with keyword:', keyword);
+filterCurrPwdTable(e) {
+        const property = e.detail.property;
+        const values = e.detail.value;
+        const conditions = {};
+        conditions[property] = values;
+        let _data = [];
 
-            // Fallback if keyword is undefined or null
-            const searchTerm = keyword ? keyword.toLowerCase() : '';
+        _data = [...this.currPwdData];
 
-            // Ensure conf has valid data to filter
-            const filteredData = conf.filter(item =>
-                item.ClientName?.toLowerCase().includes(searchTerm)
-            );
-
-            // Return the options in the format expected by the filter component
-            return filteredData.map(data => ({
-                label: data.ClientName,
-                value: data.ClientName,
-            }));
-        } catch (error) {
-            console.error('Error during filtering:', error);
-            return [];
+        for (const k in conditions) {
+            const value = conditions[k];
+            if (value.length) {
+                _data = _data.filter(_ => value.includes(_[k]));
+            }
         }
-    },
-},
+
+        this.showCurrPwdData = _data;
+    }
+
+    sortCurrPwdTable(v) {
+        const sortedTableData = [...this.currPwdData];
+        sortedTableData?.sort((a, b) => {
+            const valA = a[v.detail.value?.split(',')[0]];
+            const valB = b[v.detail.value?.split(',')[0]];
+            if (typeof valA === 'string' && typeof valB === 'string') {
+                return v.detail.value?.split(',')[1] === 'asc'
+                    ? valA.localeCompare(valB)
+                    : valB.localeCompare(valA);
+            } else {
+                return 0;
+            }
+        });
+        this.showCurrPwdData = sortedTableData;
+    }
+
+    sortApprvReqTable(v) {
+        const sortedTableData = [...this.apprvReqData];
+        sortedTableData?.sort((a, b) => {
+            const valA = a[v.detail.value?.split(',')[0]];
+            const valB = b[v.detail.value?.split(',')[0]];
+            if (typeof valA === 'string' && typeof valB === 'string') {
+                return v.detail.value?.split(',')[1] === 'asc'
+                    ? valA.localeCompare(valB)
+                    : valB.localeCompare(valA);
+            } else {
+                return 0;
+            }
+        });
+        this.showApprvReqData = sortedTableData;
+    }
+
+    sortReqHistoryTable(v) {
+        const sortedTableData = [...this.reqHistData];
+        sortedTableData?.sort((a, b) => {
+            const valA = a[v.detail.value?.split(',')[0]];
+            const valB = b[v.detail.value?.split(',')[0]];
+            if (typeof valA === 'string' && typeof valB === 'string') {
+                return v.detail.value?.split(',')[1] === 'asc'
+                    ? valA.localeCompare(valB)
+                    : valB.localeCompare(valA);
+            } else {
+                return 0;
+            }
+        });
+        this.showReqHistData = sortedTableData;
+    }
