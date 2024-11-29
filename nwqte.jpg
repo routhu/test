@@ -49,3 +49,32 @@ filterCurrPwdTable(e) {
             v.detail.value,
         );
     }
+
+${this.activeCardName ===
+                            'PasswordManagement_ShowCurrentPassword'
+                                ? html`
+                                      <sc-grid-row class="row-inner">
+                                          <sc-grid-column lg="12">
+                                              <sc-table
+                                                  class="sc-table-default"
+                                                  pagination=""
+                                                  page-size="10"
+                                                  sort=""
+                                                  .conf=${conf}
+                                                  .data=${this.showCurrPwdData}
+                                                  @sc-filter=${v =>
+                                                      this.filterCurrPwdTable(
+                                                          v,
+                                                      )}
+                                                  @sc-sort=${v =>
+                                                      this.sortCurrPwdTable(v)}
+                                              >
+                                              </sc-table>
+                                          </sc-grid-column>
+                                          ${this.currPwdData.length === 0
+                                              ? html` <sc-grid-column lg="12">
+                                                    No items
+                                                </sc-grid-column>`
+                                              : ''}
+                                      </sc-grid-row>
+                                  `
