@@ -1,29 +1,51 @@
-// utils/sortTable.js
+filterCurrPwdTable(e) {
+        const property = e.detail.property;
+        const values = e.detail.value;
+        const conditions = {};
+        conditions[property] = values;
+        let _data = [];
 
-/**
- * Sorts an array of objects based on a property and direction.
- * @param {Array} data - The array of objects to sort.
- * @param {string} sortDetail - A string in the format "property,direction".
- * @returns {Array} - The sorted array.
- */
-export function sortTable(data, sortDetail) {
-    const sortedData = [...data];
-    const [property, direction] = sortDetail.split(',');
+        _data = [...this.currPwdData];
 
-    sortedData.sort((a, b) => {
-        const valA = a[property];
-        const valB = b[property];
-
-        if (typeof valA === 'string' && typeof valB === 'string') {
-            return direction === 'asc'
-                ? valA.localeCompare(valB)
-                : valB.localeCompare(valA);
-        } else if (typeof valA === 'number' && typeof valB === 'number') {
-            return direction === 'asc' ? valA - valB : valB - valA;
-        } else {
-            return 0; // Default case for unsupported data types
+        for (const k in conditions) {
+            const value = conditions[k];
+            if (value.length) {
+                _data = _data.filter(_ => value.includes(_[k]));
+            }
         }
-    });
 
-    return sortedData;
-}
+        this.showCurrPwdData = _data;
+    }
+
+    sortTable(data, sortDetail) {
+        const sortedData = [...data];
+        const [property, direction] = sortDetail.split(',');
+
+        sortedData.sort((a, b) => {
+            const valA = a[property];
+            const valB = b[property];
+
+            if (typeof valA === 'string' && typeof valB === 'string') {
+                return direction === 'asc'
+                    ? valA.localeCompare(valB)
+                    : valB.localeCompare(valA);
+            } else if (typeof valA === 'number' && typeof valB === 'number') {
+                return direction === 'asc' ? valA - valB : valB - valA;
+            } else {
+                return 0;
+            }
+        });
+
+        return sortedData;
+    }
+
+    sortCurrPwdTable(v) {
+        this.showCurrPwdData = this.sortTable(this.currPwdData, v.detail.value);
+    }
+
+    sortApprvReqTable(v) {
+        this.showApprvReqData = this.sortTable(
+            this.apprvReqData,
+            v.detail.value,
+        );
+    }
