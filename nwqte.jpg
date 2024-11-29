@@ -1,4 +1,12 @@
-sortTable(data, sortDetail) {
+// utils/sortTable.js
+
+/**
+ * Sorts an array of objects based on a property and direction.
+ * @param {Array} data - The array of objects to sort.
+ * @param {string} sortDetail - A string in the format "property,direction".
+ * @returns {Array} - The sorted array.
+ */
+export function sortTable(data, sortDetail) {
     const sortedData = [...data];
     const [property, direction] = sortDetail.split(',');
 
@@ -18,16 +26,4 @@ sortTable(data, sortDetail) {
     });
 
     return sortedData;
-}
-
-sortCurrPwdTable(v) {
-    this.showCurrPwdData = this.sortTable(this.currPwdData, v.detail.value);
-}
-
-sortApprvReqTable(v) {
-    this.showApprvReqData = this.sortTable(this.apprvReqData, v.detail.value);
-}
-
-sortReqHistoryTable(v) {
-    this.showReqHistData = this.sortTable(this.reqHistData, v.detail.value);
 }
