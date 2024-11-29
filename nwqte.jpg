@@ -1,1 +1,1586 @@
     
+import { contexts, createContext } from '@scdevkit/data';
+import { LitElement, css, html } from 'lit';
+import { sharedStyles } from '../../../../assets/shared-styles.js';
+import '../../../../components/SearchClientModal.js';
+import GraphQLClientService from '../../../../services/grapghql-service.js';
+import NavigationService from '../../../../services/navigation-service.js';
+import './UpdateRecord.js';
+import './VerificationManagement.js';
+import './components/attachFileModal.js';
+import {
+    clientManagement,
+    contactManagement,
+    verificationManager,
+} from './components/card-definitions.js';
+import {
+    queryGetApprReqs,
+    queryGetClientMasterId,
+    queryGetCurrPwds,
+    queryGetPwdHistory,
+    queryPostNewEncry,
+} from './queries.js';
+import { getCommonTransformer } from './transformer.js';
+
+const navigationContext = createContext(contexts.NAVIGATION);
+
+let conf = [];
+let approvalRequest = [];
+let requestHistory = [];
+let attachments = [];
+
+export class PasswordManagement extends LitElement {
+    static navigationService;
+    static graphQLClientService;
+
+    static styles = [
+        sharedStyles,
+        css`
+            .loading {
+                margin-top: 10rem;
+                text-align: center;
+            }
+            .row-card {
+                padding: 0px 0;
+                align-items: flex-start;
+                width: 100% !important;
+            }
+            sc-table {
+                width: 100%;
+                overflow-x: auto;
+            }
+            .password-container {
+                margin: 20px;
+                min-height: 50vh;
+            }
+            .password-btn-container {
+                display: flex;
+                justify-content: space-between;
+                margin-top: 16px;
+                div {
+                    display: flex;
+                    gap: 16px;
+                }
+            }
+            .password-panel {
+                h2 {
+                    margin: 0px;
+                }
+            }
+            .dropdown-container {
+                width: fit-content;
+            }
+            .error-message-color {
+                color: #ff0000;
+            }
+            .success-message-color {
+                color: #0000ff;
+            }
+            .flex-space-bw-div {
+                display: flex;
+                justify-content: space-between;
+            }
+            .warning-message {
+                margin-top: 16px;
+                padding: 15px;
+            }
+            .verification-label {
+                display: flex;
+                gap: 16px;
+                margin-top: 24px;
+            }
+            .verification-container {
+                display: flex;
+                flex-direction: column;
+                gap: 16px;
+
+                .verification-email {
+                    width: fit-content;
+                }
+            }
+            .client-name-container {
+                display: flex;
+                align-items: center;
+                gap: 16px;
+
+                .client-name-dropdown {
+                    width: 100%;
+                }
+
+                .manual-tooltip {
+                    margin-top: 14px;
+                }
+            }
+        `,
+    ];
+
+    static properties = {
+        selectedValue: { type: String },
+        activeCardName: { type: String },
+        selectcategory: { type: String },
+        selectedPwdType: { type: String },
+        fileUploadModal: { type: Boolean },
+        selectedClientName: { type: String },
+        selectedLeid: { type: String },
+        businessFunction: { type: String },
+        businessFunctionRole: { type: String },
+        businessFunctionRoleListData: { type: Array },
+        successMessage: { type: String },
+        errorMessage: { type: String },
+        comments: { type: String },
+        newPwd: { type: String },
+        byPassEncryptionWarningMessage: { type: String },
+        clientData: { type: Array },
+        currPwdData: { type: Array },
+        apprvReqData: { type: Array },
+        reqHistData: { type: Array },
+        isApprvReq: { type: Boolean, state: true },
+        clientName: { type: String },
+        leid: { type: String },
+        currPwd: { type: String },
+        reqPwd: { type: String },
+        makerComments: { type: String },
+        isDataLoaded: { type: Boolean },
+        pwdLevel: { type: Boolean },
+        reqId: { type: String },
+        isSave: { type: Boolean },
+        isDelete: { type: Boolean },
+        ClientNameId: { type: Array, state: true },
+        openSearchClient: { type: Boolean, state: true },
+        isAttachModel: { type: Boolean, state: true },
+        attachmentData: { type: Array },
+    };
+
+    constructor() {
+        super();
+        this.pwdLevel = false;
+        this.selectedValue = '';
+        this.activeCardName = '';
+        this.selectcategory = '';
+        this.selectedPwdType = 'Random Password';
+        this.fileUploadModal = false;
+        this.selectedClientName;
+        this.selectedLeid = '';
+        this.successMessage = '';
+        this.errorMessage = '';
+        this.comments = '';
+        this.newPwd = '';
+        this.businessFunction = '';
+        this.businessFunctionRole = '';
+        this.businessFunctionRoleListData = [];
+        this.byPassEncryptionWarningMessage = '';
+        this.clientData = [];
+        this.currPwdData = [];
+        this.apprvReqData = [];
+        this.reqHistData = [];
+        this.attachmentData = [];
+        this.isApprvReq = false;
+        this.isSave = false;
+        this.navigationService = new NavigationService(this);
+
+        this.clientName = '';
+        this.leid = '';
+        this.currPwd = '';
+        this.reqPwd = '';
+        this.makerComments = '';
+        this.isDataLoaded = false;
+        this.reqId = '';
+        this.isDelete = false;
+
+        this.ClientNameId = [];
+        this.openSearchClient = false;
+        this.isAttachModel = false;
+
+        try {
+            this.graphQLClientService = new GraphQLClientService(this);
+        } catch (error) {
+            console.log({ error });
+        }
+    }
+
+    connectedCallback() {
+        super.connectedCallback();
+        this.isDataLoaded = false;
+        this.isAttachModel = false;
+        this.businessFunction = sessionStorage.getItem('businessFunction');
+        this.businessFunctionRole = sessionStorage.getItem(
+            'businessFunctionRole',
+        );
+
+        this.ClientNameId = [];
+        this.openSearchClient = false;
+
+        conf = [
+            /* {
+                property: 'ReqID',
+                header: 'Req ID',
+                sort: true,
+                columnStyle: '',
+                cell: (value, properties) => {
+                    return html` <sc-link
+                        @click=${e => (
+                            (this.isSave = true),
+                            (this.isDelete = true),
+                            this.apprRowDetail(properties)
+                        )}
+                        >${value}</sc-link
+                    >`;
+                },
+            }, */
+            {
+                property: 'ClientName',
+                header: 'Client/Product Name',
+                sort: true,
+                filter: true,
+                filterParams: {
+                    lookup(keyword) {
+                        return new Promise(res => {
+                            setTimeout(function () {
+                                res(
+                                    conf
+                                        .filter(_ =>
+                                            keyword
+                                                ? _.fruit.includes(keyword)
+                                                : true,
+                                        )
+                                        .map(d => ({
+                                            label: d.fruit,
+                                            value: d.fruit,
+                                        })),
+                                );
+                            }, 1000);
+                        });
+                    },
+                },
+            },
+            {
+                property: 'LEID',
+                header: 'LE ID',
+                sort: true,
+                filter: true,
+                columnStyle: '',
+            },
+            {
+                property: 'Country',
+                header: 'Country',
+                sort: false,
+                filter: true,
+                columnStyle: '',
+            },
+            {
+                property: 'currPwd',
+                header: 'Current Password',
+                sort: false,
+                filter: true,
+                columnStyle: '',
+            },
+            {
+                property: 'PreviousPwd',
+                header: 'Previous Password',
+                sort: false,
+                filter: true,
+                columnStyle: '',
+            },
+            {
+                property: 'MakerRequestDateTime',
+                header: 'Maker Request Date/Time',
+                sort: false,
+                filter: true,
+                columnStyle: '',
+            },
+            {
+                property: 'Maker',
+                header: 'Maker',
+                sort: false,
+                filter: true,
+                columnStyle: '',
+            },
+            {
+                property: 'CheckerApprovedDateTime',
+                header: 'Checker Approved Date/Time',
+                sort: false,
+                filter: true,
+                columnStyle: '',
+            },
+            {
+                property: 'Checker',
+                header: 'Checker',
+                sort: false,
+                filter: true,
+                columnStyle: '',
+            },
+        ];
+
+        approvalRequest = [
+            {
+                property: 'ReqID',
+                header: 'Req ID',
+                sort: true,
+                columnStyle: '',
+                cell: (value, properties) => {
+                    return html` <sc-link
+                        @click=${e => (
+                            (this.isSave = true),
+                            (this.isDelete = false),
+                            this.apprRowDetail(properties)
+                        )}
+                        >${value}</sc-link
+                    >`;
+                },
+            },
+            {
+                property: 'ClientName',
+                header: 'Client Name',
+                sort: false,
+                columnStyle: '',
+            },
+            {
+                property: 'LEID',
+                header: 'LE ID',
+                sort: false,
+                columnStyle: '',
+            },
+            {
+                property: 'Status',
+                header: 'Status',
+                sort: false,
+                columnStyle: '',
+            },
+            {
+                property: 'Maker',
+                header: 'Maker',
+                sort: false,
+                columnStyle: '',
+            },
+            {
+                property: 'MakerRequestDateTime',
+                header: 'Maker Request Date Time',
+                sort: false,
+                columnStyle: '',
+            },
+            /*  {
+                property: 'currPwd',
+                header: 'Current Password',
+                sort: false,
+                columnStyle: '',
+            },
+            {
+                property: 'reqPwd',
+                header: 'Requested Password',
+                sort: false,
+                columnStyle: '',
+            },
+            {
+                property: 'makerComments',
+                header: 'Maker Comments',
+                sort: false,
+                columnStyle: '',
+            }, */
+        ];
+
+        requestHistory = [
+            {
+                property: 'ReqID',
+                header: 'Req ID',
+                sort: true,
+                columnStyle: '',
+                cell: (value, properties) => {
+                    return html` <sc-link
+                        @click=${e => (
+                            (this.isSave = false),
+                            (this.isDelete = false),
+                            this.apprRowDetail(properties)
+                        )}
+                        >${value}</sc-link
+                    >`;
+                },
+            },
+            {
+                property: 'ClientName',
+                header: 'ClientName',
+                sort: false,
+                columnStyle: '',
+            },
+            {
+                property: 'LEID',
+                header: 'LE ID',
+                sort: false,
+                columnStyle: '',
+            },
+            {
+                property: 'Status',
+                header: 'Status',
+                sort: false,
+                columnStyle: '',
+            },
+            {
+                property: 'RequestedPwd',
+                header: 'Requested Password',
+                sort: false,
+                columnStyle: '',
+            },
+            {
+                property: 'Maker',
+                header: 'Maker',
+                sort: false,
+                columnStyle: '',
+            },
+            {
+                property: 'MakingDateTime',
+                header: 'Making Date Time',
+                sort: false,
+                columnStyle: '',
+            },
+            {
+                property: 'Checker',
+                header: 'Checker',
+                sort: false,
+                columnStyle: '',
+            },
+            {
+                property: 'CheckingDateTime',
+                header: 'Checking Date Time',
+                sort: false,
+                columnStyle: '',
+            },
+            /* {
+                property: 'currPwd',
+                header: 'Current Password',
+                sort: false,
+                columnStyle: '',
+            },
+            {
+                property: 'makerComments',
+                header: 'Maker Comments',
+                sort: false,
+                columnStyle: '',
+            },
+            {
+                property: 'checkerComments',
+                header: 'Checker Comments',
+                sort: false,
+                columnStyle: '',
+            }, */
+        ];
+
+        attachments = [
+            {
+                property: 'No',
+                header: '',
+                sort: false,
+                columnStyle: '',
+            },
+            {
+                property: 'Subject',
+                header: 'Subject',
+                sort: false,
+                columnStyle: '',
+            },
+            {
+                property: 'FileUploaded',
+                header: 'File Uploaded',
+                sort: false,
+                columnStyle: '',
+            },
+            {
+                property: 'Action',
+                header: '',
+                cell: (value, properties) => {
+                    return html`<sc-icon-button
+                        type="default"
+                        size="lg"
+                        name="trash--line"
+                        no-border=""
+                        @click=${() => {
+                            this.onAttachmentDeleteClick(properties);
+                        }}
+                    >
+                    </sc-icon-button>`;
+                },
+            },
+        ];
+
+        // this.loadRoleListData();
+    }
+
+    disconnectedCallback() {
+        super.disconnectedCallback();
+
+        this.ClientNameId = [];
+        this.openSearchClient = false;
+    }
+
+    apprRowDetail(row) {
+        this.isApprvReq = true;
+        this.reqId = row.ReqID;
+        this.clientName = row.ClientName;
+        this.leid = row.LEID;
+        this.currPwd = row.currPwd;
+        this.reqPwd = row.reqPwd;
+        this.makerComments = row.makerComments;
+        //  this.requestUpdate();
+        // this.navigationService.go(`updaterecord`);
+        // console.log(row);
+    }
+
+    handleBusinessFunctionSelection(v) {
+        this.businessFunction = v.detail.value;
+    }
+
+    handleBusinessFunctionRoleSelection(v) {
+        this.businessFunctionRole = v.detail.value;
+    }
+    handleDropdownChange(event) {
+        this.selectedValue = event.target.value;
+        this.activeCardName = '';
+        this.requestUpdate();
+    }
+
+    handleClientSrchSelectionBind(e) {
+        this.errorMessage = '';
+        if (e.detail.clientId) {
+            this.ClientNameId = [
+                {
+                    label: e.detail.clientName,
+                    value: e.detail.clientName,
+                },
+            ];
+
+            this.selectedClientName = e.detail.clientName;
+            this.selectedLeid = e.detail.clientId?.split('/')[0];
+        } else {
+        }
+    }
+
+    _handleButtonClick(name) {
+        this.verificationSuccessMessage = '';
+        this.activeCardName = name;
+        this.isDataLoaded = false;
+
+        if (name.includes('ShowCurrentPassword')) {
+            this.loadCurrPwd();
+
+            this.isDataLoaded = true;
+        }
+        if (name.includes('ApprovalRequests')) {
+            this.loadApprReq();
+            this.isDataLoaded = true;
+        }
+        if (name.includes('RequestHistory')) {
+            this.loadReqHistory();
+            this.isDataLoaded = true;
+        }
+    }
+
+    handleRadioChange(event) {
+        this.errorMessage = '';
+        this.comments = '';
+        this.selectedPwdType = event.target.value;
+        event.target.value === 'By Pass Encryption'
+            ? (this.byPassEncryptionWarningMessage =
+                  'Warning !! No Password on attachments will be set by the system')
+            : (this.byPassEncryptionWarningMessage = '');
+    }
+
+    openModal() {
+        this.fileUploadModal = true;
+    }
+
+    fileUploadModalHide() {
+        this.fileUploadModal = false;
+    }
+
+    handlePwdLevel(e) {
+        if (e.detail.value == 'Client Specific') {
+            this.pwdLevel = true;
+        }
+    }
+
+    async saveData(data) {
+        const qry = queryPostNewEncry(data);
+        const res = await this.graphQLClientService.query(qry);
+        const out = await getCommonTransformer(res, 'post_PwdMgmt');
+        if (out.message.includes('Data Created successfully')) {
+            this.successMessage = 'REQUEST HAS BEEN SUCCESSFULLY SUBMITTED';
+        }
+        if (out.message.includes('Duplicate')) {
+            this.errorMessage = out.message;
+        }
+
+        if (this.successMessage === 'REQUEST HAS BEEN SUCCESSFULLY SUBMITTED') {
+            this.selectedClientName = '';
+            this.selectedPwdType = '';
+            this.selectcategory = '';
+            this.selectedLeid = '';
+        }
+    }
+
+    handleSubmitClick() {
+        this.errorMessage = '';
+        let data = {};
+        if (this.selectedClientName !== '') {
+            if (this.selectedPwdType === 'By Pass Encryption') {
+                if (this.comments === '') {
+                    this.errorMessage = 'Comment is Required';
+                } else {
+                    this.errorMessage = '';
+                    data = {
+                        clientName: this.selectedClientName,
+                        leid: this.selectedLeid,
+                        newEncry: '<ByPassEncryption>',
+                        makerComments: this.comments,
+                        txnMode: 'New',
+                    };
+                    this.saveData(data);
+                }
+            } else if (this.selectedPwdType === 'Random Password') {
+                this.errorMessage = '';
+                data = {
+                    clientName: this.selectedClientName,
+                    leid: this.selectedLeid,
+                    newEncry: '<Random>',
+                    makerComments: '',
+                    txnMode: 'New',
+                };
+                this.saveData(data);
+            } else if (this.selectedPwdType === 'Standard Password') {
+                if (this.comments === '') {
+                    this.errorMessage = 'Comment is Required';
+                } else if (this.newPwd === '') {
+                    this.errorMessage = 'New Password is Required';
+                } else {
+                    this.errorMessage = '';
+                    data = {
+                        clientName: this.selectedClientName,
+                        leid: this.selectedLeid,
+                        newEncry: this.newPwd,
+                        makerComments: this.comments,
+                        txnMode: 'New',
+                    };
+                    this.saveData(data);
+                }
+            } else {
+                this.selectedPwdType = 'Random Password';
+            }
+        } else {
+            this.errorMessage = 'Client Name is Required';
+        }
+    }
+    async handleSearchInput(ev) {
+        let searchObject = {
+            externalCusId: '',
+            externalCustName: '',
+            leid: '',
+            fmIdFilterBy: '',
+            clientName: ev.detail.value,
+            clientId: '',
+            groupName: '',
+            clientSearchType: 'client',
+            fmNameFilterBy: '',
+            clientIdFilterBy: '',
+            clientNameFilterBy: '',
+            groupNameFilterBy: '',
+        };
+        if (ev.detail.value.length > 3) {
+            const qry = queryGetClientMasterId(searchObject);
+
+            const res = await this.graphQLClientService.query(qry);
+            this.clientData = await getCommonTransformer(
+                res,
+                'getClientFMPickList',
+            );
+        }
+    }
+
+    async loadCurrPwd() {
+        const qry = queryGetCurrPwds();
+        let data = [];
+        const res = await this.graphQLClientService.query(qry);
+        data = await getCommonTransformer(res, 'get_CurrPasswords');
+        this.currPwdData = data.map(item => ({
+            ReqID: item.id,
+            ClientName: item.clientName,
+            LEID: item.leid,
+            Country: item.country,
+            currPwd: item.newPwd,
+            PreviousPwd: item.previousPwd,
+            UpdateMakerRequestDateTimedby: item.updatedBy,
+            UpdatedDateTime: item.updatedOn,
+            Maker: item.maker,
+            CheckerApprovedDateTime: item.checkerRequest,
+            Checker: item.checker,
+        }));
+    }
+
+    async loadApprReq() {
+        const qry = queryGetApprReqs();
+        const res = await this.graphQLClientService.query(qry);
+        const data = await getCommonTransformer(res, 'get_ApprovalReq');
+        this.apprvReqData = data.map(item => ({
+            ReqID: item.id,
+            ClientName: item.clientName,
+            LEID: item.leid,
+            Status: item.status,
+            Maker: item.maker,
+            MakerRequestDateTime: item.makerRequest,
+            currPwd: item.previousPwd,
+            reqPwd: item.newPwd,
+            makerComments: item.makerComments,
+        }));
+    }
+
+    async loadReqHistory() {
+        const qry = queryGetPwdHistory();
+        const res = await this.graphQLClientService.query(qry);
+        const data = await getCommonTransformer(res, 'get_PwdHistory');
+        this.reqHistData = data.map(item => ({
+            ReqID: item.id,
+            ClientName: item.clientName,
+            LEID: item.leid,
+            Status: item.status,
+            RequestedPwd: item.newPwd,
+            Maker: item.maker,
+            MakingDateTime: item.makerRequest,
+            Checker: item.checker,
+            CheckingDateTime: item.checkerRequest,
+            currPwd: item.previousPwd,
+            reqPwd: item.newPwd,
+            makerComments: item.makerComments,
+            checkerComments: item.checkerComments,
+        }));
+    }
+
+    openClientIDSearchModal() {
+        this.openSearchClient = true;
+    }
+
+    handleAttachments(data) {
+        this.attachmentData = [
+            ...this.attachmentData,
+            {
+                No: this.attachmentData.length + 1,
+                Subject: data.fileName,
+                FileUploaded: `.. /${data.fileName}`,
+            },
+        ];
+    }
+
+    onAttachmentDeleteClick(file) {
+        this.attachmentData = this.attachmentData.filter(
+            attachment => attachment?.fileName !== file.fileName,
+        );
+    }
+
+    renderContentPanel() {
+        let content = '';
+
+        content = html`
+            <sc-grid-row class="row">
+                <sc-grid-column>
+                    <div class="dropdown-container">
+                        <sc-dropdown-input
+                            label="Select Module"
+                            label-size="xs"
+                            border-type="box"
+                            @sc-select="${this.handleDropdownChange}"
+                        >
+                            <sc-dropdown-option value="Password Management"
+                                >Password Management</sc-dropdown-option
+                            >
+                            <sc-dropdown-option value="Verification Management"
+                                >Verification Management</sc-dropdown-option
+                            >
+                        </sc-dropdown-input>
+                    </div>
+
+                    <div
+                        class="button-container ${this.selectedValue ===
+                        'Password Management'
+                            ? 'visible password-btn-container'
+                            : ''}"
+                    >
+                        <div>
+                            <sc-button
+                                type="default"
+                                size="md"
+                                width="auto"
+                                icon-position="right"
+                                loading-text=""
+                                ?fill=${this.activeCardName ===
+                                'PasswordManagement_NewUpdate'
+                                    ? true
+                                    : false}
+                                @click=${() =>
+                                    this._handleButtonClick(
+                                        'PasswordManagement_NewUpdate',
+                                    )}
+                            >
+                                New/ Update
+                            </sc-button>
+                            <sc-button
+                                type="default"
+                                size="md"
+                                width="auto"
+                                icon-position="right"
+                                loading-text=""
+                                ?fill=${this.activeCardName ===
+                                'PasswordManagement_ShowCurrentPassword'
+                                    ? true
+                                    : false}
+                                @click=${() =>
+                                    this._handleButtonClick(
+                                        'PasswordManagement_ShowCurrentPassword',
+                                    )}
+                            >
+                                Show Current Passwords
+                            </sc-button>
+                            <sc-button
+                                type="default"
+                                size="md"
+                                width="auto"
+                                icon-position="right"
+                                loading-text=""
+                                ?fill=${this.activeCardName ===
+                                'PasswordManagement_ApprovalRequests'
+                                    ? true
+                                    : false}
+                                @click=${() =>
+                                    this._handleButtonClick(
+                                        'PasswordManagement_ApprovalRequests',
+                                    )}
+                            >
+                                Approval Requests
+                            </sc-button>
+                            <sc-button
+                                type="default"
+                                size="md"
+                                width="auto"
+                                icon-position="right"
+                                loading-text=""
+                                ?fill=${this.activeCardName ===
+                                'PasswordManagement_RequestHistory'
+                                    ? true
+                                    : false}
+                                @click=${() =>
+                                    this._handleButtonClick(
+                                        'PasswordManagement_RequestHistory',
+                                    )}
+                            >
+                                Request History
+                            </sc-button>
+                        </div>
+                    </div>
+
+                    <div
+                        class="button-container ${this.selectedValue ===
+                        'Verification Management'
+                            ? 'visible password-btn-container'
+                            : ''}"
+                    >
+                        <div>
+                            <create-verification-management></create-verification-management>
+                        </div>
+                    </div>
+
+                    <sc-grid-row
+                        class="button-container ${this.selectedValue ===
+                        'Client Management'
+                            ? 'visible'
+                            : ''}"
+                    >
+                        <sc-grid-column lg="2">
+                            <sc-button
+                                type="default"
+                                size="md"
+                                width="auto"
+                                icon-position="right"
+                                loading-text=""
+                                @click=${() =>
+                                    this._handleButtonClick(
+                                        'clientManagement_ApprovalRequest',
+                                    )}
+                            >
+                                Approval Requests
+                            </sc-button>
+                        </sc-grid-column>
+                        <sc-grid-column lg="3">
+                            <sc-button
+                                type="default"
+                                size="md"
+                                width="auto"
+                                icon-position="right"
+                                loading-text=""
+                                @click=${() =>
+                                    this._handleButtonClick(
+                                        'clientManagement_RequestHistory',
+                                    )}
+                            >
+                                Request History
+                            </sc-button>
+                        </sc-grid-column>
+
+                        <sc-grid-column lg="2"> </sc-grid-column>
+                        <sc-grid-column lg="2"></sc-grid-column>
+                    </sc-grid-row>
+                    <sc-grid-row
+                        class="button-container ${this.selectedValue ===
+                        'Contact Management'
+                            ? 'visible'
+                            : ''}"
+                    >
+                        <sc-grid-column lg="2">
+                            <sc-button
+                                type="default"
+                                size="md"
+                                width="auto"
+                                icon-position="right"
+                                loading-text=""
+                                @click=${() =>
+                                    this._handleButtonClick(
+                                        'contactManagement_ApprovalRequest',
+                                    )}
+                            >
+                                Approval Requests
+                            </sc-button>
+                        </sc-grid-column>
+                        <sc-grid-column lg="3">
+                            <sc-button
+                                type="default"
+                                size="md"
+                                width="auto"
+                                icon-position="right"
+                                loading-text=""
+                                @click=${() =>
+                                    this._handleButtonClick(
+                                        'contactManagement_RequestHistory',
+                                    )}
+                            >
+                                Request History
+                            </sc-button>
+                        </sc-grid-column>
+
+                        <sc-grid-column lg="2"> </sc-grid-column>
+                        <sc-grid-column lg="2"></sc-grid-column>
+                    </sc-grid-row>
+                    <sc-grid-row class="row-card">
+                        <sc-grid-column lg="12">
+                            ${this.activeCardName ===
+                            'PasswordManagement_NewUpdate'
+                                ? html`
+                                      <sc-card
+                                          title-size="sm"
+                                          sub-title-size="sm"
+                                          body-size="sm"
+                                          space-size="md"
+                                          text-align="left"
+                                          vertical-align="middle"
+                                          width="100%"
+                                          height="auto"
+                                          icon=""
+                                          icon-size="md"
+                                          icon-vertical-align="middle"
+                                      >
+                                          <div slot="title">Password Setup</div>
+                                          <div slot="body">
+                                              <sc-grid-row class="row-inner">
+                                                  <sc-grid-column lg="3">
+                                                      <sc-input-group
+                                                          label="Password level"
+                                                          id="Transferworkfrom"
+                                                          label-size="xs"
+                                                          tooltip=""
+                                                          tooltip-placement="right"
+                                                          error-message=""
+                                                          help-text=""
+                                                          success-message=""
+                                                          width="100%"
+                                                          required=""
+                                                      >
+                                                          <sc-dropdown-input
+                                                              label="Dropdown"
+                                                              label-size="xs"
+                                                              tooltip=""
+                                                              tooltip-placement="top"
+                                                              placeholder=""
+                                                              help-text=""
+                                                              value=""
+                                                              border-type="line"
+                                                              success-message=""
+                                                              error-message=""
+                                                              @sc-select=${ev =>
+                                                                  this.handlePwdLevel(
+                                                                      ev,
+                                                                  )}
+                                                          >
+                                                              <sc-dropdown-option
+                                                                  value="Client Specific"
+                                                                  >ClientSpecific</sc-dropdown-option
+                                                              >
+                                                          </sc-dropdown-input>
+                                                      </sc-input-group>
+                                                  </sc-grid-column>
+                                                  ${this.pwdLevel
+                                                      ? html`<sc-grid-column
+                                                            lg="5"
+                                                            class="client-name-container"
+                                                        >
+                                                            <sc-dropdown-input
+                                                                class="client-name-dropdown"
+                                                                label="Client Name"
+                                                                label-size="xs"
+                                                                value=${this
+                                                                    .selectedClientName}
+                                                                border-type="box"
+                                                                required=""
+                                                                disabled=""
+                                                                .data=${this
+                                                                    .ClientNameId}
+                                                            >
+                                                            </sc-dropdown-input>
+                                                            <sc-tooltip
+                                                                class="manual-tooltip"
+                                                                content="Click to search client"
+                                                                placement="top"
+                                                                mode="dark"
+                                                                distance="0"
+                                                                skidding="0"
+                                                                trigger="hover"
+                                                                content-max-width="144px"
+                                                            >
+                                                                <sc-icon-button
+                                                                    type="default"
+                                                                    size="lg"
+                                                                    name="search"
+                                                                    no-border=""
+                                                                    @click="${this
+                                                                        .openClientIDSearchModal}"
+                                                                >
+                                                                </sc-icon-button>
+                                                                <div
+                                                                    slot="content"
+                                                                >
+                                                                    Click to
+                                                                    search
+                                                                    client
+                                                                </div>
+                                                            </sc-tooltip>
+                                                        </sc-grid-column> `
+                                                      : html``}
+                                                  ${this.selectedLeid
+                                                      ? html`<sc-grid-column
+                                                            lg="2"
+                                                        >
+                                                            <sc-label
+                                                                label="LE ID"
+                                                                label-size="xs"
+                                                            >
+                                                            </sc-label>
+                                                            <strong
+                                                                >${this
+                                                                    .selectedLeid}</strong
+                                                            >
+                                                        </sc-grid-column>`
+                                                      : ''}
+                                              </sc-grid-row>
+                                              <sc-grid-row class="row-inner">
+                                                  <sc-grid-column lg="8">
+                                                      <sc-grid-row>
+                                                          <div
+                                                              class="flex-space-bw-div"
+                                                          >
+                                                              <sc-radio-group
+                                                                  direction="vertical"
+                                                                  value=${this
+                                                                      .selectedPwdType}
+                                                                  label="SETUP A PASSWORD FOR OUTGOING EMAIL ATTACHMENTS"
+                                                                  @sc-change="${this
+                                                                      .handleRadioChange}"
+                                                              >
+                                                                  <sc-radio
+                                                                      value="By Pass Encryption"
+                                                                      >By Pass
+                                                                      Encryption</sc-radio
+                                                                  >
+                                                                  <sc-radio
+                                                                      value="Random Password"
+                                                                      >Random
+                                                                      Password</sc-radio
+                                                                  >
+                                                                  <sc-radio
+                                                                      value="Standard Password"
+                                                                      >Standard
+                                                                      Password</sc-radio
+                                                                  >
+                                                              </sc-radio-group>
+                                                              ${this
+                                                                  .selectedPwdType ===
+                                                                  'By Pass Encryption' ||
+                                                              this
+                                                                  .selectedPwdType ===
+                                                                  'Standard Password'
+                                                                  ? html`<div
+                                                                        class="warning-message"
+                                                                    >
+                                                                        <sc-tooltip
+                                                                            class="manual-tooltip"
+                                                                            content="Click to Attach File"
+                                                                            placement="top"
+                                                                            mode="dark"
+                                                                            distance="0"
+                                                                            skidding="0"
+                                                                            trigger="hover"
+                                                                            content-max-width="144px"
+                                                                        >
+                                                                            <sc-icon-button
+                                                                                type="default"
+                                                                                size="lg"
+                                                                                name="attach"
+                                                                                no-border=""
+                                                                                @click=${() => {
+                                                                                    this.isAttachModel = true;
+                                                                                }}
+                                                                            >
+                                                                            </sc-icon-button>
+                                                                            <div
+                                                                                slot="content"
+                                                                            >
+                                                                                Click
+                                                                                to
+                                                                                Attach
+                                                                                File
+                                                                            </div>
+                                                                        </sc-tooltip>
+
+                                                                        ${this
+                                                                            .selectedPwdType ===
+                                                                        'By Pass Encryption'
+                                                                            ? html`
+                                                                                  ${this
+                                                                                      .byPassEncryptionWarningMessage}
+                                                                              `
+                                                                            : ''}
+                                                                    </div> `
+                                                                  : ''}
+                                                          </div>
+                                                      </sc-grid-row>
+                                                  </sc-grid-column>
+                                                  <sc-grid-column
+                                                      lg="2"
+                                                  ></sc-grid-column>
+                                              </sc-grid-row>
+
+                                              ${this.selectedPwdType ===
+                                                  'By Pass Encryption' ||
+                                              this.selectedPwdType ===
+                                                  'Standard Password'
+                                                  ? html`<sc-grid-row
+                                                            class="row-inner"
+                                                        >
+                                                            <sc-grid-column
+                                                                lg="12"
+                                                            >
+                                                                <sc-input-group
+                                                                    label="Comments"
+                                                                    id="RelationshipNumber"
+                                                                    label-size="xs"
+                                                                    tooltip=""
+                                                                    tooltip-placement="right"
+                                                                    error-message=""
+                                                                    help-text=""
+                                                                    success-message=""
+                                                                    width="100%"
+                                                                    required=""
+                                                                >
+                                                                    <sc-text-input
+                                                                        multiline=""
+                                                                        label="Comments"
+                                                                        border-type="line"
+                                                                        id="Comments"
+                                                                        value=${this
+                                                                            .comments}
+                                                                        @sc-input=${e => {
+                                                                            (this.comments =
+                                                                                e.detail.value),
+                                                                                (this.errorMessage =
+                                                                                    '');
+                                                                        }}
+                                                                    ></sc-text-input>
+                                                                </sc-input-group>
+                                                            </sc-grid-column>
+                                                        </sc-grid-row>
+                                                        <sc-grid-row>
+                                                            ${this.isAttachModel
+                                                                ? html`<sb-attach-docs
+                                                                      attachModel=${this
+                                                                          .isAttachModel}
+                                                                      .caseId=${this
+                                                                          .srCaseId}
+                                                                      .isRightPanel=${false}
+                                                                      .userId=${sessionStorage.getItem(
+                                                                          'userPSID',
+                                                                      ) || ''}
+                                                                      .countryCode=${this
+                                                                          .caseOrgCountry}
+                                                                      .businessFunction=${this
+                                                                          .businessFunction}
+                                                                      @sc-pwd-attach-modal-close=${v => {
+                                                                          this.isAttachModel = false;
+                                                                      }}
+                                                                      @sc-pwd-attach-modal-save=${v => {
+                                                                          this.isAttachModel = false;
+                                                                          this.handleAttachments(
+                                                                              v
+                                                                                  .detail
+                                                                                  .data,
+                                                                          );
+                                                                      }}
+                                                                  >
+                                                                  </sb-attach-docs>`
+                                                                : html``}
+                                                        </sc-grid-row>
+
+                                                        ${this.attachmentData
+                                                            .length > 0
+                                                            ? html`
+                                                                  <sc-grid-row
+                                                                      class="row-inner"
+                                                                  >
+                                                                      <sc-grid-column
+                                                                          lg="12"
+                                                                      >
+                                                                          <sc-banner
+                                                                              background-color="gradient-blue"
+                                                                              text-alignment="left"
+                                                                              image-src=""
+                                                                              image-position="right"
+                                                                              space-size="md"
+                                                                          >
+                                                                              <div
+                                                                                  slot="title"
+                                                                              >
+                                                                                  Uploaded
+                                                                                  Files
+                                                                                  to
+                                                                                  be
+                                                                                  Attached
+                                                                              </div>
+                                                                          </sc-banner>
+                                                                      </sc-grid-column>
+                                                                  </sc-grid-row>
+                                                                  <sc-grid-row>
+                                                                      <sc-grid-column
+                                                                          lg="12"
+                                                                      >
+                                                                          <sc-table
+                                                                              class="sc-table-default"
+                                                                              pagination=""
+                                                                              page-size="10"
+                                                                              sort=""
+                                                                              .conf=${attachments}
+                                                                              .data=${this
+                                                                                  .attachmentData}
+                                                                          >
+                                                                          </sc-table>
+                                                                      </sc-grid-column>
+                                                                  </sc-grid-row>
+                                                              `
+                                                            : html``}`
+                                                  : ``}
+                                              ${this.selectedPwdType ===
+                                              'Random Password'
+                                                  ? html`<sc-grid-column lg="3">
+                                                        <sc-label
+                                                            label=""
+                                                            label-size="s"
+                                                        >
+                                                            <div slot="label">
+                                                                <strong
+                                                                    >New
+                                                                    Password</strong
+                                                                >
+                                                            </div>
+                                                        </sc-label>
+                                                        <sc-label
+                                                            label="<Random>"
+                                                            label-size="s"
+                                                        >
+                                                        </sc-label>
+                                                    </sc-grid-column>`
+                                                  : this.selectedPwdType ===
+                                                      'By Pass Encryption'
+                                                    ? html` <sc-grid-column
+                                                          lg="3"
+                                                      >
+                                                          <sc-label
+                                                              label=""
+                                                              label-size="s"
+                                                          >
+                                                              <div slot="label">
+                                                                  <strong
+                                                                      >New
+                                                                      Password</strong
+                                                                  >
+                                                              </div>
+                                                          </sc-label>
+                                                          <sc-label
+                                                              label="<ByPassEncryption>"
+                                                              label-size="s"
+                                                          >
+                                                          </sc-label>
+                                                      </sc-grid-column>`
+                                                    : this.selectedPwdType ===
+                                                        'Standard Password'
+                                                      ? html` <sc-grid-row
+                                                            class="row-inner"
+                                                        >
+                                                            <sc-grid-column
+                                                                lg="3"
+                                                            >
+                                                                <sc-input-group
+                                                                    label="New Password"
+                                                                    id="RelationshipNumber"
+                                                                    label-size="xs"
+                                                                    tooltip=""
+                                                                    tooltip-placement="right"
+                                                                    error-message=""
+                                                                    help-text=""
+                                                                    success-message=""
+                                                                    width="100%"
+                                                                    required=""
+                                                                >
+                                                                    <sc-text-input
+                                                                        label="New Password"
+                                                                        border-type="line"
+                                                                        id="NewPwd"
+                                                                        @sc-input=${e => {
+                                                                            this.newPwd =
+                                                                                e.detail.value;
+                                                                        }}
+                                                                    ></sc-text-input>
+                                                                </sc-input-group>
+                                                            </sc-grid-column>
+                                                            <sc-grid-column
+                                                                lg="3"
+                                                            ></sc-grid-column>
+                                                            <sc-grid-column
+                                                                lg="2"
+                                                            ></sc-grid-column>
+                                                            <sc-grid-column
+                                                                lg="2"
+                                                            ></sc-grid-column>
+                                                        </sc-grid-row>`
+                                                      : ''}
+
+                                              <sc-grid-row
+                                                  ><sc-grid-column
+                                                      lg="12"
+                                                      class="error-message-color"
+                                                  >
+                                                      ${this.errorMessage}
+                                                  </sc-grid-column>
+                                              </sc-grid-row>
+                                              <strong
+                                                  >${this
+                                                      .successMessage}</strong
+                                              >
+                                              <sc-grid-row class="row-inner">
+                                                  <sc-grid-column lg="3">
+                                                      <sc-button
+                                                          type="default"
+                                                          fill=""
+                                                          size="md"
+                                                          width="auto"
+                                                          icon-position="right"
+                                                          loading-text=""
+                                                          ?disabled=${!this
+                                                              .selectedClientName}
+                                                          @click="${this
+                                                              .handleSubmitClick}"
+                                                      >
+                                                          Submit
+                                                      </sc-button>
+                                                  </sc-grid-column>
+                                                  <sc-grid-column
+                                                      lg="3"
+                                                  ></sc-grid-column>
+                                                  <sc-grid-column
+                                                      lg="2"
+                                                  ></sc-grid-column>
+                                                  <sc-grid-column
+                                                      lg="2"
+                                                  ></sc-grid-column>
+                                              </sc-grid-row>
+                                          </div>
+
+                                          <div slot="prefix"></div>
+                                          <div slot="suffix"></div>
+                                          <div slot="header"></div>
+                                          <div
+                                              slot="footer"
+                                              style="display:flex;width:100%;justify-content:flex-end"
+                                          ></div>
+                                      </sc-card>
+                                  `
+                                : ''}
+                            ${this.activeCardName ===
+                            'PasswordManagement_ShowCurrentPassword'
+                                ? html`
+                                      <sc-grid-row class="row-inner">
+                                          <sc-grid-column lg="12">
+                                              <sc-table
+                                                  class="sc-table-default"
+                                                  pagination=""
+                                                  page-size="10"
+                                                  sort=""
+                                                  .conf=${conf}
+                                                  .data=${this.currPwdData}
+                                              >
+                                              </sc-table>
+                                          </sc-grid-column>
+                                          ${this.currPwdData.length === 0
+                                              ? html` <sc-grid-column lg="12">
+                                                    No items
+                                                </sc-grid-column>`
+                                              : ''}
+                                      </sc-grid-row>
+                                  `
+                                : this.activeCardName ===
+                                        'PasswordManagement_ShowCurrentPassword' &&
+                                    this.isDataLoaded === false
+                                  ? html`<div class="loading">
+                                        <sc-spinner type="component" size="xxl">
+                                        </sc-spinner>
+                                        <sc-spacer size="sm" vertical="">
+                                        </sc-spacer>
+                                        Loading ...
+                                    </div>`
+                                  : ''}
+                            ${this.activeCardName ===
+                            'PasswordManagement_ApprovalRequests'
+                                ? html`
+                                      <sc-grid-row class="row-inner">
+                                          <sc-grid-column lg="12">
+                                              <sc-table
+                                                  class="sc-table-default"
+                                                  pagination=""
+                                                  page-size="10"
+                                                  sort=""
+                                                  .conf=${approvalRequest}
+                                                  .data=${this.apprvReqData}
+                                              >
+                                              </sc-table>
+                                          </sc-grid-column>
+                                          ${this.apprvReqData.length === 0
+                                              ? html` <sc-grid-column lg="12">
+                                                    No items
+                                                </sc-grid-column>`
+                                              : ''}
+                                      </sc-grid-row>
+                                  `
+                                : this.activeCardName ===
+                                        'PasswordManagement_ApprovalRequests' &&
+                                    this.isDataLoaded === false
+                                  ? html`<div class="loading">
+                                        <sc-spinner type="component" size="xxl">
+                                        </sc-spinner>
+                                        <sc-spacer size="sm" vertical="">
+                                        </sc-spacer>
+                                        Loading ...
+                                    </div>`
+                                  : ''}
+                            ${this.activeCardName ===
+                            'PasswordManagement_RequestHistory'
+                                ? html`
+                                      <sc-grid-row class="row-inner">
+                                          <sc-grid-column lg="12">
+                                              <sc-table
+                                                  class="sc-table-default"
+                                                  pagination=""
+                                                  page-size="10"
+                                                  sort=""
+                                                  .conf=${requestHistory}
+                                                  .data=${this.reqHistData}
+                                              >
+                                              </sc-table>
+                                          </sc-grid-column>
+                                          ${this.reqHistData.length === 0
+                                              ? html` <sc-grid-column lg="12">
+                                                    No items
+                                                </sc-grid-column>`
+                                              : ''}
+                                      </sc-grid-row>
+                                  `
+                                : this.activeCardName ===
+                                        'PasswordManagement_RequestHistory' &&
+                                    this.isDataLoaded === false
+                                  ? html`<div class="loading">
+                                        <sc-spinner type="component" size="xxl">
+                                        </sc-spinner>
+                                        <sc-spacer size="sm" vertical="">
+                                        </sc-spacer>
+                                        Loading ...
+                                    </div>`
+                                  : ''}
+                            ${this.activeCardName &&
+                            verificationManager[this.activeCardName]
+                                ? verificationManager[this.activeCardName]
+                                : ''}
+                            ${this.activeCardName &&
+                            clientManagement[this.activeCardName]
+                                ? clientManagement[this.activeCardName]
+                                : ''}
+                            ${this.activeCardName &&
+                            contactManagement[this.activeCardName]
+                                ? contactManagement[this.activeCardName]
+                                : ''}
+                        </sc-grid-column>
+                    </sc-grid-row>
+                </sc-grid-column>
+            </sc-grid-row>
+            ${this.isApprvReq === true
+                ? html` <sb-update-passwordrecord
+                      .open=${this.isApprvReq}
+                      .reqId=${this.reqId}
+                      .clientName=${this.clientName}
+                      .leid=${this.leid}
+                      .currPwd=${this.currPwd}
+                      .reqPwd=${this.reqPwd}
+                      .makerComments=${this.makerComments}
+                      @sb-update-passwordrecord-close=${() => {
+                          this.isApprvReq = false;
+                          this.loadApprReq();
+                      }}
+                      .isSave=${this.isSave}
+                      .isDelete=${this.isDelete}
+                  >
+                  </sb-update-passwordrecord>`
+                : html``}
+        `;
+        return content;
+    }
+
+    render() {
+        return html` <div class="password-container">
+                <sc-box height="100%">
+                    <div class="password-panel">
+                        <h2>Password & Verification</h2>
+                        ${this.renderContentPanel()}
+                    </div>
+                </sc-box>
+            </div>
+            ${this.openSearchClient
+                ? html`<search-client-modal
+                      .open=${this.openSearchClient}
+                      .caseOriginatingCountry=${this.sroriginatingcountry}
+                      .openingSource=${'passwordmanagement'}
+                      @sc-search-client-modal-close=${() => {
+                          this.openSearchClient = false;
+                      }}
+                      @sc-search-client-selected-row=${e => {
+                          this.handleClientSrchSelectionBind(e);
+                      }}
+                  >
+                  </search-client-modal>`
+                : html``}`;
+    }
+}
