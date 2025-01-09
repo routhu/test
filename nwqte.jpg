@@ -1,16 +1,18 @@
 validateRequiredField() {
-        const dropdown = this.shadowRoot.querySelector('sc-dropdown-input');
-        const textInput = this.shadowRoot.querySelector('sc-text-input');
-        let isValid = true;
+    const dropdown = this.shadowRoot.querySelector('sc-dropdown-input');
+    const textInput = this.shadowRoot.querySelector('sc-text-input');
+    let isValid = true;
 
-        if (!dropdown.value || !textInput.value) {
-            dropdown.setAttribute('error-message', 'This field is required.');
-            textInput.setAttribute('error-message', 'This field is required.');
-            isValid = false;
-        } else {
-            textInput.setAttribute('error-message', '');
-            dropdown.setAttribute('error-message', '');
-        }
+    // Helper function to validate a field
+    const validateField = (field) => {
+        const isFieldValid = !!field.value;
+        field.setAttribute('error-message', isFieldValid ? '' : 'This field is required.');
+        return isFieldValid;
+    };
 
-        return isValid;
-    }
+    // Validate each field
+    isValid = validateField(dropdown) && isValid;
+    isValid = validateField(textInput) && isValid;
+
+    return isValid;
+}
