@@ -1,23 +1,17 @@
+validate() {
+    const fileInput = this.shadowRoot.querySelector('sc-file-input');
+    const checkbox = this.shadowRoot.querySelector('sc-checkbox-group');
+    let isValid = true;
 
-   validate() {
-        const fileInput = this.shadowRoot.querySelector('sc-file-input');
-        const checkbox = this.shadowRoot.querySelector('sc-checkbox-group');
-        let isValid = true;
+    // Validate file input
+    const hasFile = this.file.length > 0;
+    fileInput.setAttribute('error-message', hasFile ? '' : 'Upload file is required.');
+    isValid = isValid && hasFile;
 
-        if (this.file.length <= 0) {
-            fileInput.setAttribute('error-message', 'Upload file is required.');
-            isValid = false;
-        } else {
-            fileInput.setAttribute('error-message', '');
-        }
-        if (this.pickList.length <= 0) {
-            checkbox.setAttribute(
-                'error-message',
-                'Please select at least one.',
-            );
-            isValid = false;
-        } else {
-            checkbox.setAttribute('error-message', '');
-        }
-        return isValid;
-    }
+    // Validate checkbox selection
+    const hasSelection = this.pickList.length > 0;
+    checkbox.setAttribute('error-message', hasSelection ? '' : 'Please select at least one.');
+    isValid = isValid && hasSelection;
+
+    return isValid;
+}
