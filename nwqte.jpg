@@ -1,17 +1,16 @@
-validate() {
-    const fileInput = this.shadowRoot.querySelector('sc-file-input');
-    const checkbox = this.shadowRoot.querySelector('sc-checkbox-group');
-    let isValid = true;
+validateRequiredField() {
+        const dropdown = this.shadowRoot.querySelector('sc-dropdown-input');
+        const textInput = this.shadowRoot.querySelector('sc-text-input');
+        let isValid = true;
 
-    // Validate file input
-    const hasFile = this.file.length > 0;
-    fileInput.setAttribute('error-message', hasFile ? '' : 'Upload file is required.');
-    isValid = isValid && hasFile;
+        if (!dropdown.value || !textInput.value) {
+            dropdown.setAttribute('error-message', 'This field is required.');
+            textInput.setAttribute('error-message', 'This field is required.');
+            isValid = false;
+        } else {
+            textInput.setAttribute('error-message', '');
+            dropdown.setAttribute('error-message', '');
+        }
 
-    // Validate checkbox selection
-    const hasSelection = this.pickList.length > 0;
-    checkbox.setAttribute('error-message', hasSelection ? '' : 'Please select at least one.');
-    isValid = isValid && hasSelection;
-
-    return isValid;
-}
+        return isValid;
+    }
