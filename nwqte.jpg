@@ -3,6 +3,48 @@ validateSLAInput() {
     this.validateField('nearSLA', this.nearSLA);
     this.validateField('breachSLA', this.BreachSLA);
 
+    // Update form validation errors
+    this.formValidationErrors = { ...this.formValidationErrors };
+}
+
+validateField(field, value) {
+    // Clear existing errors for the field
+    this.formValidationErrors[field] = [];
+
+    // Perform validations based on the field type
+    if (field === 'nearSLA' || field === 'breachSLA') {
+        this.validateRequired(field, value);
+        this.validateNearSLABreachSLA(field, this.nearSLA, this.BreachSLA);
+    }
+
+    // Update form validation errors if any value is present
+    if (value) {
+        this.formValidationErrors = { ...this.formValidationErrors };
+    }
+}
+
+validateRequired(field, value) {
+    // Check if the value is valid and not zero
+    if (!value || value === 0) {
+        this.formValidationErrors[field].push('Cannot be Zero');
+    }
+}
+
+validateNearSLABreachSLA(field, nearSLA, breachSLA) {
+    // Ensure Near SLA is not greater than Breach SLA
+    if (nearSLA > breachSLA) {
+        const errorMessage =
+            field === 'nearSLA'
+                ? 'Nearing SLA Cannot be greater than Breached SLA'
+                : 'Breached SLA Cannot be less than Nearing SLA';
+        this.formValidationErrors[field].push(errorMessage);
+    }
+}
+validateSLAInput() {
+    // Validate Near SLA and Breach SLA inputs
+    this.validateField('nearSLA', this.nearSLA);
+    this.validateField('breachSLA', this.BreachSLA);
+
     // Check for specific error messages in validation results
     const nearSLAErrors = this.formValidationErrors.nearSLA || [];
     const breachSLAErrors = this.formValidationErrors.breachSLA || [];
