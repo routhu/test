@@ -1,1 +1,53 @@
+validateSLAInput() {
+    // Validate Near SLA and Breach SLA inputs
+    this.validateField('nearSLA', this.nearSLA);
+    this.validateField('breachSLA', this.BreachSLA);
 
+    // Check for specific error messages in validation results
+    const nearSLAErrors = this.formValidationErrors.nearSLA || [];
+    const breachSLAErrors = this.formValidationErrors.breachSLA || [];
+
+    // If specific error messages exist, return false (validation failed)
+    const hasBlockingErrors = nearSLAErrors.includes(
+        'Nearing SLA Cannot be greater than Breached SLA'
+    ) || breachSLAErrors.includes(
+        'Breached SLA Cannot be less than Nearing SLA'
+    );
+
+    return !hasBlockingErrors; // Return true if no blocking errors
+}
+
+async handleSubmit() {
+    try {
+        // Validate required fields in the shadow DOM
+        const requiredFieldsValid = validateRequiredField(this.shadowRoot);
+
+        // Validate SLA inputs
+        const slaValid = this.validateSLAInput();
+
+        // Block submission if either validation fails
+        if (!requiredFieldsValid || !slaValid) {
+            console.warn('Form submission blocked due to validation errors.');
+            return; // Block form submission
+        }
+
+        // Proceed with the rest of the form submission logic
+        this.isLoading = true;
+        const valuesArray = [];
+
+        const WorkBasketName = this.workbasketLabel;
+        const UniqueWorkBasketName = this.uniqueWorkbasket;
+        const pyLabel = this.selectedWBdropdown || this.uniqueWorkbasket;
+        const NearingSLA = this.nearSLA;
+        const BreachedSLA = this.BreachSLA;
+
+        const rowValues = {
+            insName: WorkBasketName,
+            pyLabel: pyLabel,
+            workBasketName: UniqueWorkBasketName,
+            wbName: pyLabel,
+            nearingSlaTime: NearingSLA,
+            breachedSlaTime: BreachedSLA,
+            applicationName: this.businessFunction,
+            createdBy: this.userPSID,
+            makerName: this.userOp
