@@ -1,1 +1,403 @@
 
+import { SbElement } from '@scdevkit/service-bench-core';
+import ScGridStyle from '@scdevkit/webkit/styles/ScGridStyle.js';
+import { css, html } from 'lit';
+import GraphQLClientService from '../../../../services/grapghql-service.js';
+import { addUpdateQueueRequest } from '../queries.js';
+import { getCommomTransformer } from '../transformer.js';
+import { validateRequiredField } from '../utils.js';
+import DelegationStyles from './styles.js';
+
+export default class AddUpdateRecord extends SbElement {
+    static styles = [
+        this.styles,
+        css`
+            ${ScGridStyle} ${DelegationStyles}
+        `,
+    ];
+
+    static graphQLClientService;
+    static properties = {
+        comments: { type: String },
+        formValidationErrors: { type: Object, state: true },
+        selectWorkbasketRow: { type: Object },
+        workbasketLabel: { type: String },
+        uniqueWorkbasket: { type: String },
+        nearSLA: { type: Number },
+        BreachSLA: { type: Number },
+        isLoading: { type: Boolean, state: true },
+        deleteCheck: { type: Boolean },
+    };
+
+    constructor() {
+        super();
+        this.comments = '';
+        this.workbasketLabel = '';
+        this.uniqueWorkbasket = '';
+        this.isLoading = false;
+        this.nearSLA = 0;
+        this.BreachSLA = 0;
+        this.selectedWBdropdown = '';
+        this.deleteCheck = false;
+        this.selectWorkbasketRow = {
+            label: '',
+            workbasket: '',
+            uniqueWorkBasketName: '',
+        };
+        this.formValidationErrors = {
+            nearSLA: [],
+            breachSLA: [],
+        };
+
+        try {
+            this.graphQLClientService = new GraphQLClientService(this);
+        } catch (error) {
+            console.log({ error });
+        }
+    }
+
+    connectedCallback() {
+        super.connectedCallback();
+    }
+
+    disconnectedCallback() {
+        super.disconnectedCallback();
+        this.isLoading = false;
+        this.formValidationErrors = {
+            nearSLA: [],
+            breachSLA: [],
+        };
+    }
+
+    closeModal() {
+        this.requestUpdate();
+        const event = new CustomEvent('sb-add-update-record-close', {
+            detail: { open: false },
+        });
+        this.dispatchEvent(event);
+    }
+
+    handleDropdownChange(event) {
+        this.selectedValue = event.target.value;
+    }
+
+    /*     validateForm() {
+        this.validateField('nearSLA', this.nearSLA);
+        this.validateField('breachSLA', this.BreachSLA);
+        this.formValidationErrors = { ...this.formValidationErrors };
+    } */
+
+    validateSLAInput() {
+        const breachSLA = this.BreachSLA;
+        const nearSLA = this.nearSLA;
+
+        this.validateField('nearSLA', nearSLA);
+        this.validateField('breachSLA', breachSLA);
+
+        this.formValidationErrors = { ...this.formValidationErrors };
+    }
+
+    validateField(field, value) {
+        this.formValidationErrors[field] = [];
+        switch (field) {
+            case 'nearSLA':
+                this.validateRequired('nearSLA', value);
+                this.validateNearSLABreachSLA(
+                    field,
+                    this.nearSLA,
+                    this.BreachSLA,
+                );
+                break;
+            case 'breachSLA':
+                this.validateRequired('breachSLA', value);
+                this.validateNearSLABreachSLA(
+                    field,
+                    this.nearSLA,
+                    this.BreachSLA,
+                );
+                break;
+            default:
+                break;
+        }
+        if (value) {
+            this.formValidationErrors = { ...this.formValidationErrors };
+        }
+    }
+
+    validateRequired(field, value) {
+        if (!(value || this[field])) {
+            this.formValidationErrors[field].push(`Cannot be Zero`);
+        } else if (value == 0) {
+            this.formValidationErrors[field].push(`Cannot be Zero`);
+        }
+    }
+
+    validateNearSLABreachSLA(field, nearsla, breachsla) {
+        console.log(nearsla, breachsla);
+        if (nearsla > breachsla) {
+            switch (field) {
+                case 'nearSLA':
+                    this.formValidationErrors[field].push(
+                        `Nearing SLA Cannot be greater then Breached SLA`,
+                    );
+                    break;
+                case 'breachSLA':
+                    this.formValidationErrors[field].push(
+                        `Breached SLA Cannot be less then Nearing SLA`,
+                    );
+                    break;
+                default:
+                    break;
+            }
+        }
+    }
+
+    ddlChange(e) {
+        const selectedWorkbasket = e.detail.value;
+        this.selectedWBdropdown = selectedWorkbasket;
+        this.selectWorkbasketRow =
+            this.workbasketListData.find(
+                item => item.workbasket === selectedWorkbasket,
+            ) || {};
+        this.workbasketLabel = this.selectWorkbasketRow.label;
+        this.uniqueWorkbasket = this.selectWorkbasketRow.workbasket;
+    }
+
+    handleDeleteCheck(v) {
+        this.deleteCheck = v.detail.checked;
+    }
+
+    async handleSubmit() {
+        try {
+            if (
+                validateRequiredField(this.shadowRoot) &&
+                this.validateSLAInput()
+            ) {
+                this.isLoading = true;
+                const valuesArray = [];
+
+                const WorkBasketName = this.workbasketLabel;
+                const UniqueWorkBasketName = this.uniqueWorkbasket;
+                const pyLabel =
+                    this.selectedWBdropdown || this.uniqueWorkbasket;
+                const NearingSLA = this.nearSLA;
+                const BreachedSLA = this.BreachSLA;
+
+                const rowValues = {
+                    insName: WorkBasketName, // WORK BASKET NAME IN CAPS LETTER
+                    pyLabel: pyLabel, // (PARENT/CHILD) LABLE (e.g. for child ___workbasket name , for parent : workbasket name)
+                    workBasketName: UniqueWorkBasketName, // wORK BASKET NAME
+                    wbName: pyLabel,
+                    nearingSlaTime: NearingSLA,
+                    breachedSlaTime: BreachedSLA,
+                    applicationName: this.businessFunction,
+                    createdBy: this.userPSID,
+                    makerName: this.userOpName,
+                    makerComments: this.comments,
+                    active: !this.deleteCheck ? 'Y' : 'N',
+                    id: +this.id,
+                };
+                valuesArray.push(rowValues);
+
+                let query = addUpdateQueueRequest(
+                    valuesArray
+                        .map(item => {
+                            const keyValuePairs = Object.entries(item)
+                                .map(([key, value]) => {
+                                    if (
+                                        key === 'nearingSlaTime' ||
+                                        key === 'breachedSlaTime' ||
+                                        key === 'id'
+                                    ) {
+                                        return `${key}:${value}`;
+                                    } else {
+                                        return `${key}:"${value}"`;
+                                    }
+                                })
+                                .join(',');
+                            return `{${keyValuePairs}}`;
+                        })
+                        .join(','),
+                );
+
+                let response = await this.graphQLClientService.query(query);
+                const result = await getCommomTransformer(
+                    response,
+                    'post_addUpdateQueueRequest',
+                );
+
+                if (result != null) {
+                    const event = new CustomEvent(
+                        'sb-add-update-record-result',
+                        {
+                            detail: {
+                                open: false,
+                                data: result,
+                                message:
+                                    'REQUEST HAS BEEN SUCCESSFULLY UPDATED',
+                            },
+                        },
+                    );
+                    this.dispatchEvent(event);
+                    this.isLoading = false;
+                    this.closeModal();
+                }
+            }
+        } catch (error) {
+            console.error('Error loading page data:', error);
+        }
+    }
+    render() {
+        return html`
+            <sc-modal
+                .open=${this.open}
+                disable-outside-click=""
+                @sc-hide=${this.closeModal}
+            >
+                <div slot="header" class="modal_header">${this.title}</div>
+                <div class="modal-body">
+                    <sc-grid-row>
+                        <sc-grid-column lg="4">
+                            <sc-text-input
+                                clearable=""
+                                label="Work Basket Name"
+                                label-size="xxs"
+                                border-type="box"
+                                readonly=""
+                                value=${this.workbasketLabel || '--'}
+                            >
+                            </sc-text-input>
+                        </sc-grid-column>
+                        <sc-grid-column lg="4">
+                            <sc-text-input
+                                clearable=""
+                                label="Unique Work Basket Name"
+                                label-size="xxs"
+                                border-type="box"
+                                readonly=""
+                                value=${this.uniqueWorkbasket || '--'}
+                            >
+                            </sc-text-input>
+                        </sc-grid-column>
+
+                        ${this.isAddRecord
+                            ? html` <sc-grid-column lg="4"
+                                  ><sc-dropdown-input
+                                      label="Work Basket Name - Unique Name"
+                                      label-size="xxs"
+                                      placeholder="Select.."
+                                      border-type="box"
+                                      required=""
+                                      value=${this.selectedWBdropdown}
+                                      @sc-select=${e => this.ddlChange(e)}
+                                      .data=${this.workBasketList}
+                                  >
+                                  </sc-dropdown-input
+                              ></sc-grid-column>`
+                            : html`<sc-grid-column lg="4"
+                                  ><sc-text-input
+                                      clearable=""
+                                      label="Work Basket Name - Unique Name"
+                                      label-size="xxs"
+                                      border-type="box"
+                                      readonly=""
+                                      value=${this.workBasketAndUniqueName ||
+                                      '--'}
+                                  >
+                                  </sc-text-input>
+                              </sc-grid-column>`}
+                    </sc-grid-row>
+                    <sc-grid-row>
+                        <sc-grid-column lg="4">
+                            <sc-number-input
+                                label="Nearing SLA Time (in Minutes)"
+                                label-size="xxs"
+                                help-text="Enter number only"
+                                border-type="box"
+                                min="1"
+                                required=""
+                                value=${this.nearSLA}
+                                error-message=${this.formValidationErrors?.nearSLA?.join(
+                                    ', ',
+                                ) || ''}
+                                @sc-input=${e => {
+                                    this.nearSLA = e.detail.value;
+                                }}
+                                @sc-blur=${v => this.validateSLAInput()}
+                            >
+                            </sc-number-input>
+                        </sc-grid-column>
+                        <sc-grid-column lg="4">
+                            <sc-number-input
+                                label="Breached SLA Time (in Minutes)"
+                                id="BreachedSLA"
+                                label-size="xxs"
+                                help-text="Enter number only"
+                                border-type="box"
+                                min="1"
+                                required=""
+                                value=${this.BreachSLA}
+                                error-message=${this.formValidationErrors?.breachSLA?.join(
+                                    ', ',
+                                ) || ''}
+                                @sc-input=${e => {
+                                    this.BreachSLA = e.detail.value;
+                                }}
+                                @sc-blur=${v => this.validateSLAInput()}
+                            >
+                            </sc-number-input>
+                        </sc-grid-column>
+                        <sc-grid-column lg="4">
+                            ${!this.isAddRecord
+                                ? html` <sc-checkbox
+                                      label="Delete"
+                                      label-size="xxs"
+                                      value=""
+                                      @sc-change="${e =>
+                                          this.handleDeleteCheck(e)}"
+                                  >
+                                  </sc-checkbox>`
+                                : html``}
+                        </sc-grid-column>
+                    </sc-grid-row>
+                    <sc-spacer size="xxs"></sc-spacer>
+                    <sc-grid-row>
+                        <sc-grid-column lg="12">
+                            <sc-text-input
+                                multiline=""
+                                label="Comments"
+                                label-size="xxs"
+                                show-character-count=""
+                                required=""
+                                rows="4"
+                                border-type="box"
+                                max-length="300"
+                                @sc-input=${e => {
+                                    this.comments = e.detail.value;
+                                }}
+                            >
+                            </sc-text-input>
+                        </sc-grid-column>
+                    </sc-grid-row>
+                </div>
+                <div slot="footer">
+                    <div class="d-flex">
+                        <sc-button
+                            fill
+                            ?loading=${this.isLoading}
+                            loading-text="...Submitting"
+                            @click=${() => this.handleSubmit()}
+                            >Submit</sc-button
+                        >
+                        <sc-spacer size="xs"></sc-spacer>
+                        <sc-button @click=${this.closeModal}>Cancel</sc-button>
+                    </div>
+                </div>
+            </sc-modal>
+        `;
+    }
+}
+
+if (!customElements.get('sb-add-update-record')) {
+    customElements.define('sb-add-update-record', AddUpdateRecord);
+}
