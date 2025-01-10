@@ -1,30 +1,96 @@
 validateSLAInput(index) {
-    if (!this.rows[index]) {
-        console.error(`Row at index ${index} is undefined`);
-        return false; // Validation fails for an undefined row
+        this.formValidationErrors[index] = {
+            nearSLA: [],
+            breachSLA: [],
+        };
+
+        this.validateField('nearSLA', this.nearSLA);
+        this.validateField('breachSLA', this.BreachSLA);
+
+        const blockingErrors = [
+            'Nearing SLA Cannot be greater than Breached SLA',
+            'Breached SLA Cannot be less than Nearing SLA',
+            'This field is required',
+        ];
+
+        const hasBlockingErrors = Object.values(this.formValidationErrors).some(
+            errors => errors.some(error => blockingErrors.includes(error)),
+        );
+
+        return !hasBlockingErrors;
     }
 
-    // Reset validation errors for the specific row
-    this.formValidationErrors[index] = {
-        nearSLA: [],
-        breachSLA: [],
-    };
+    validateSLAInput(index) {
+        if (!this.rows[index]) {
+            console.error(`Row at index ${index} is undefined`);
+            return false;
+        }
 
-    const { nearSLA, BreachSLA } = this.rows[index];
+        this.formValidationErrors[index] = {
+            nearSLA: [],
+            breachSLA: [],
+        };
 
-    // Perform validation
-    this.validateField('nearSLA', nearSLA, index, BreachSLA);
-    this.validateField('breachSLA', BreachSLA, index, nearSLA);
+        const { nearSLA, BreachSLA } = this.rows[index];
 
-    const blockingErrors = [
-        'Nearing SLA Cannot be greater than Breached SLA',
-        'Breached SLA Cannot be less than or equal to Nearing SLA',
-        'This field is required',
-    ];
+        this.validateField('nearSLA', nearSLA, index, BreachSLA);
+        this.validateField('breachSLA', BreachSLA, index, nearSLA);
 
-    const hasBlockingErrors = Object.values(this.formValidationErrors[index]).some(
-        errors => errors.some(error => blockingErrors.includes(error)),
-    );
+        const blockingErrors = [
+            'Nearing SLA Cannot be greater than Breached SLA',
+            'Breached SLA Cannot be less than or equal to Nearing SLA',
+            'This field is required',
+        ];
 
-    return !hasBlockingErrors;
-}
+        const hasBlockingErrors = Object.values(
+            this.formValidationErrors[index],
+        ).some(errors => errors.some(error => blockingErrors.includes(error)));
+
+        return !hasBlockingErrors;
+    }
+
+    validateField(field, value, index, comparisonValue) {
+        this.formValidationErrors[index][field] = [];
+        switch (field) {
+            case 'nearSLA':
+                this.validateRequired(field, value, index);
+                this.validateNearSLABreachSLA(
+                    field,
+                    value,
+                    comparisonValue,
+                    index,
+                );
+                break;
+            case 'breachSLA':
+                this.validateRequired(field, value, index);
+                this.validateNearSLABreachSLA(
+                    field,
+                    value,
+                    comparisonValue,
+                    index,
+                );
+                break;
+            default:
+                break;
+        }
+    }
+
+    validateRequired(field, value, index) {
+        if (!value || value === 0) {
+            this.formValidationErrors[index][field].push(
+                'This field is required',
+            );
+        }
+    }
+
+    validateNearSLABreachSLA(field, value, comparisonValue, index) {
+        if (field === 'nearSLA' && value >= comparisonValue) {
+            this.formValidationErrors[index][field].push(
+                'Nearing SLA Cannot be greater than Breached SLA',
+            );
+        } else if (field === 'breachSLA' && value <= comparisonValue) {
+            this.formValidationErrors[index][field].push(
+                'Breached SLA Cannot be less than or equal to Nearing SLA',
+            );
+        }
+    }
