@@ -1,60 +1,85 @@
-validateSLAInput(rowIndex) {
-    // Clear previous validation errors for this row
-    this.formValidationErrors[rowIndex] = {
-        nearSLA: [],
-        breachSLA: [],
-    };
+validateSLAInput() {
+        this.formValidationErrors = {
+            nearSLA: [],
+            breachSLA: [],
+        };
 
-    let isValid = true;
-    const row = this.rows[rowIndex];
+        this.validateField('nearSLA', this.nearSLA);
+        this.validateField('breachSLA', this.BreachSLA);
 
-    // Validate nearSLA field for this row
-    if (!row.nearSLA || row.nearSLA === 0) {
-        this.formValidationErrors[rowIndex].nearSLA.push('This field is required');
-        isValid = false;
-    }
+        const blockingErrors = [
+            'Nearing SLA Cannot be greater than Breached SLA',
+            'Breached SLA Cannot be less than Nearing SLA',
+            'This field is required',
+        ];
 
-    // Validate breachSLA field for this row
-    if (!row.BreachSLA || row.BreachSLA === 0) {
-        this.formValidationErrors[rowIndex].breachSLA.push('This field is required');
-        isValid = false;
-    }
-
-    // Business Logic Validation: NearSLA must not be greater than BreachSLA for this row
-    if (row.nearSLA >= row.BreachSLA) {
-        this.formValidationErrors[rowIndex].nearSLA.push(
-            'Nearing SLA Cannot be greater than Breached SLA'
+        const hasBlockingErrors = Object.values(this.formValidationErrors).some(
+            errors => errors.some(error => blockingErrors.includes(error)),
         );
-        this.formValidationErrors[rowIndex].breachSLA.push(
-            'Breached SLA Cannot be less than or equal to Nearing SLA'
-        );
-        isValid = false;
+
+        return !hasBlockingErrors;
     }
 
-    return isValid;
-}
+    validateField(field, value) {
+        this.formValidationErrors[field] = [];
+        switch (field) {
+            case 'nearSLA':
+                this.validateRequired('nearSLA', value);
+                this.validateNearSLABreachSLA(
+                    field,
+                    this.nearSLA,
+                    this.BreachSLA,
+                );
+                break;
+            case 'breachSLA':
+                this.validateRequired('breachSLA', value);
+                this.validateNearSLABreachSLA(
+                    field,
+                    this.nearSLA,
+                    this.BreachSLA,
+                );
+                break;
+            default:
+                break;
+        }
 
-async handleSubmit() {
-    try {
-        // Validate all rows
-        let slaValid = true;
-        for (let index = 0; index < this.rows.length; index++) {
-            const rowValid = this.validateSLAInput(index);
-            if (!rowValid) {
-                slaValid = false;
+        this.formValidationErrors = { ...this.formValidationErrors };
+    }
+
+    validateRequired(field, value) {
+        if (!value) {
+            this.formValidationErrors[field].push(`This field is required`);
+        } else if (value === 0) {
+            this.formValidationErrors[field].push(`This field is required`);
+        }
+    }
+
+    validateNearSLABreachSLA(field, nearsla, breachsla) {
+        if (nearsla >= breachsla) {
+            if (field === 'nearSLA') {
+                this.formValidationErrors[field].push(
+                    'Nearing SLA Cannot be greater than Breached SLA',
+                );
+            } else if (field === 'breachSLA') {
+                this.formValidationErrors[field].push(
+                    'Breached SLA Cannot be less than or equal to Nearing SLA',
+                );
             }
         }
-
-        const requiredFieldsValid = this.validateRequiredField();
-
-        if (!slaValid || !requiredFieldsValid) {
-            return;
-        }
-
-        // Your submit logic continues...
-        this.isLoading = true;
-        // Rest of the submission code...
-    } catch (error) {
-        console.error('Error loading page data:', error);
     }
-}
+
+    validateRequiredField() {
+        const requiredFields =
+            this.shadowRoot.querySelectorAll('.validate-field');
+        let isValid = true;
+
+        requiredFields.forEach(field => {
+            if (!field.value) {
+                field.setAttribute('error-message', 'This field is required.');
+                isValid = false;
+            } else {
+                field.setAttribute('error-message', '');
+            }
+        });
+        return isValid;
+    }
