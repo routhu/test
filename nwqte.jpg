@@ -1,17 +1,34 @@
-    handleDropdownChange(event, index) {
-        this.selectedValue = event.target.value;
-    }
+handleDropdownChange(event, index) {
+    // Get the selected value from the dropdown
+    const selectedValue = event.detail.value || event.target.value;
 
-    ddlChange(e) {
-        console.log(e);
-        const selectedWorkbasket = e.detail.value;
-        this.selectedWBdropdown = selectedWorkbasket;
-        this.selectWorkbasketRow =
-            this.workbasketListData.find(
-                item => item.workbasket === selectedWorkbasket,
-            ) || {};
+    // Find the matching workbasket row from the dropdown data
+    const selectedWorkbasketRow = this.workbasketListData.find(
+        (item) => item.workbasket === selectedValue
+    ) || {};
 
-        console.log(this.selectWorkbasketRow);
-        this.workbasketLabel = this.selectWorkbasketRow.label;
-        this.uniqueWorkbasket = this.selectWorkbasketRow.workbasket;
-    }
+    // Extract relevant fields from the selected workbasket
+    const workbasketLabel = selectedWorkbasketRow.label || '';
+    const uniqueWorkbasket = selectedWorkbasketRow.workbasket || '';
+
+    // Update the specific row with the selected dropdown value and related data
+    this.rows = this.rows.map((row, i) =>
+        i === index
+            ? {
+                  ...row,
+                  selectedWBdropdown: selectedValue,
+                  workbasketLabel,
+                  uniqueWorkbasket,
+              }
+            : row
+    );
+
+    // Update individual properties for general use (optional, if needed elsewhere)
+    this.selectedWBdropdown = selectedValue;
+    this.selectWorkbasketRow = selectedWorkbasketRow;
+    this.workbasketLabel = workbasketLabel;
+    this.uniqueWorkbasket = uniqueWorkbasket;
+
+    // Trigger re-render
+    this.requestUpdate();
+}
