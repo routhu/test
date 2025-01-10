@@ -1,4 +1,3 @@
-
 import { SbElement } from '@scdevkit/service-bench-core';
 import ScGridStyle from '@scdevkit/webkit/styles/ScGridStyle.js';
 import { css, html } from 'lit';
@@ -50,12 +49,12 @@ export default class AddUpdateRecord extends SbElement {
         };
         this.rows = [
             {
-                productGroup: '',
-                productSubGroup: '',
-                productAndServices: '',
-                queryType: '',
-                selfServiceAvailability: '',
-                message: '',
+                workbasketLabel: '',
+                uniqueWorkbasket: '',
+                selectedWBdropdown: '',
+                workBasketAndUniqueName: '',
+                nearSLA: '',
+                BreachSLA: '',
             },
         ];
 
@@ -83,12 +82,12 @@ export default class AddUpdateRecord extends SbElement {
         this.rows = [
             ...this.rows,
             {
-                productGroup: '',
-                productSubGroup: '',
-                productAndServices: '',
-                queryType: '',
-                selfServiceAvailability: '',
-                message: '',
+                workbasketLabel: '',
+                uniqueWorkbasket: '',
+                selectedWBdropdown: '',
+                workBasketAndUniqueName: '',
+                nearSLA: '',
+                BreachSLA: '',
             },
         ];
     }
@@ -108,29 +107,28 @@ export default class AddUpdateRecord extends SbElement {
         this.dispatchEvent(event);
     }
 
-    handleAddRowClick() {
-        this.rows = [
-            ...this.rows,
-            {
-                productGroup: '',
-                productSubGroup: '',
-                productAndServices: '',
-                queryType: '',
-                selfServiceAvailability: '',
-                message: '',
-            },
-        ];
-    }
+    handleDropdownChange(event, index) {
+        const selectedValue = event.target.value;
+        const selectWorkbasketRow =
+            this.workbasketListData.find(
+                item => item.workbasket === selectedWorkbasket,
+            ) || {};
+        const workbasketLabel = `${selectWorkbasketRow.label}`;
+        const uniqueWorkbasket = `${selectWorkbasketRow.workbasket}`;
 
-    handleDeleteRowClick(index) {
-        if (this.rows.length > 1) {
-            this.rows.splice(index, 1);
-            this.rows = [...this.rows];
-        }
-    }
-
-    handleDropdownChange(event) {
-        this.selectedValue = event.target.value;
+        /*  this.selectedWBdropdown = selectedWorkbasket;
+        this.workbasketLabel = this.selectWorkbasketRow.label;
+         */
+        this.rows = this.rows.map((row, i) =>
+            i === index
+                ? {
+                      ...row,
+                      selectedWBdropdown: selectedValue,
+                      workbasketLabel: workbasketLabel,
+                      uniqueWorkbasket: uniqueWorkbasket,
+                  }
+                : row,
+        );
     }
 
     validateSLAInput() {
@@ -217,17 +215,6 @@ export default class AddUpdateRecord extends SbElement {
             }
         });
         return isValid;
-    }
-
-    ddlChange(e) {
-        const selectedWorkbasket = e.detail.value;
-        this.selectedWBdropdown = selectedWorkbasket;
-        this.selectWorkbasketRow =
-            this.workbasketListData.find(
-                item => item.workbasket === selectedWorkbasket,
-            ) || {};
-        this.workbasketLabel = this.selectWorkbasketRow.label;
-        this.uniqueWorkbasket = this.selectWorkbasketRow.workbasket;
     }
 
     handleDeleteCheck(v) {
@@ -374,10 +361,13 @@ export default class AddUpdateRecord extends SbElement {
                                                   placeholder="Select.."
                                                   border-type="box"
                                                   required=""
-                                                  value=${this
-                                                      .selectedWBdropdown}
+                                                  value=${row.selectedWBdropdown ||
+                                                  ''}
                                                   @sc-select=${e =>
-                                                      this.ddlChange(e)}
+                                                      this.handleDropdownChange(
+                                                          e,
+                                                          index,
+                                                      )}
                                                   .data=${this.workBasketList}
                                               >
                                               </sc-dropdown-input>
@@ -389,8 +379,7 @@ export default class AddUpdateRecord extends SbElement {
                                                   label-size="xxs"
                                                   border-type="box"
                                                   readonly=""
-                                                  value=${this
-                                                      .workBasketAndUniqueName ||
+                                                  value=${row.workBasketAndUniqueName ||
                                                   '--'}
                                               >
                                               </sc-text-input>
@@ -403,7 +392,7 @@ export default class AddUpdateRecord extends SbElement {
                                             border-type="box"
                                             min="1"
                                             required=""
-                                            value=${this.nearSLA}
+                                            value=${row.nearSLA}
                                             error-message=${this.formValidationErrors?.nearSLA?.join(
                                                 ', ',
                                             ) || ''}
@@ -424,7 +413,7 @@ export default class AddUpdateRecord extends SbElement {
                                             border-type="box"
                                             min="1"
                                             required=""
-                                            value=${this.BreachSLA}
+                                            value=${row.BreachSLA}
                                             error-message=${this.formValidationErrors?.breachSLA?.join(
                                                 ', ',
                                             ) || ''}
