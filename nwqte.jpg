@@ -1,526 +1,61 @@
-import { SbElement } from '@scdevkit/service-bench-core';
-import ScGridStyle from '@scdevkit/webkit/styles/ScGridStyle.js';
-import { css, html } from 'lit';
-import GraphQLClientService from '../../../../services/grapghql-service.js';
-import { addUpdateQueueRequest } from '../queries.js';
-import { getCommomTransformer } from '../transformer.js';
-import DelegationStyles from './styles.js';
-
-export default class AddUpdateRecord extends SbElement {
-    static styles = [
-        this.styles,
-        css`
-            ${ScGridStyle} ${DelegationStyles}
-        `,
-    ];
-
-    static graphQLClientService;
-    static properties = {
-        comments: { type: String },
-        formValidationErrors: { type: Object, state: true },
-        selectWorkbasketRow: { type: Object },
-        workbasketLabel: { type: String },
-        uniqueWorkbasket: { type: String },
-        nearSLA: { type: Number },
-        BreachSLA: { type: Number },
-        isLoading: { type: Boolean, state: true },
-        deleteCheck: { type: Boolean },
-        rows: { type: Array },
+validateSLAInput(index) {
+    // Reset validation errors for the specific row
+    this.formValidationErrors[index] = {
+        nearSLA: [],
+        breachSLA: [],
     };
 
-    constructor() {
-        super();
-        this.comments = '';
-        this.workbasketLabel = '';
-        this.uniqueWorkbasket = '';
-        this.isLoading = false;
-        this.nearSLA = 0;
-        this.BreachSLA = 0;
-        this.selectedWBdropdown = '';
-        this.deleteCheck = false;
-        this.selectWorkbasketRow = {
-            label: '',
-            workbasket: '',
-            uniqueWorkBasketName: '',
-        };
-        this.formValidationErrors = {
-            nearSLA: [],
-            breachSLA: [],
-        };
-        this.rows = [
-            {
-                workbasketLabel: '',
-                uniqueWorkbasket: '',
-                selectedWBdropdown: '',
-                workBasketAndUniqueName: '',
-                nearSLA: '',
-                BreachSLA: '',
-            },
-        ];
+    // Get the values for the specific row
+    const { nearSLA, BreachSLA } = this.rows[index];
 
-        try {
-            this.graphQLClientService = new GraphQLClientService(this);
-        } catch (error) {
-            console.log({ error });
-        }
-    }
+    // Perform validation
+    this.validateField('nearSLA', nearSLA, index, BreachSLA);
+    this.validateField('breachSLA', BreachSLA, index, nearSLA);
 
-    connectedCallback() {
-        super.connectedCallback();
-    }
+    // Check if there are blocking errors for the specific row
+    const blockingErrors = [
+        'Nearing SLA Cannot be greater than Breached SLA',
+        'Breached SLA Cannot be less than or equal to Nearing SLA',
+        'This field is required',
+    ];
 
-    disconnectedCallback() {
-        super.disconnectedCallback();
-        this.isLoading = false;
-        this.formValidationErrors = {
-            nearSLA: [],
-            breachSLA: [],
-        };
-    }
+    const hasBlockingErrors = Object.values(this.formValidationErrors[index]).some(
+        errors => errors.some(error => blockingErrors.includes(error)),
+    );
 
-    handleAddRowClick() {
-        this.rows = [
-            ...this.rows,
-            {
-                workbasketLabel: '',
-                uniqueWorkbasket: '',
-                selectedWBdropdown: '',
-                workBasketAndUniqueName: '',
-                nearSLA: '',
-                BreachSLA: '',
-            },
-        ];
-    }
+    return !hasBlockingErrors;
+}
 
-    handleDeleteRowClick(index) {
-        if (this.rows.length > 1) {
-            this.rows.splice(index, 1);
-            this.rows = [...this.rows];
-        }
-    }
-
-    closeSideSheet() {
-        this.requestUpdate();
-        const event = new CustomEvent('sb-add-update-record-close', {
-            detail: { open: false },
-        });
-        this.dispatchEvent(event);
-    }
-
-    handleDropdownChange(event, index) {
-        const selectedValue = event.detail.value || event.target.value;
-
-        const selectedWorkbasketRow =
-            this.workbasketListData.find(
-                item => item.workbasket === selectedValue,
-            ) || {};
-
-        const workbasketLabel = selectedWorkbasketRow.label || '';
-        const uniqueWorkbasket = selectedWorkbasketRow.workbasket || '';
-
-        this.rows = this.rows.map((row, i) =>
-            i === index
-                ? {
-                      ...row,
-                      selectedWBdropdown: selectedValue,
-                      workbasketLabel,
-                      uniqueWorkbasket,
-                  }
-                : row,
-        );
-
-        this.selectedWBdropdown = selectedValue;
-        this.selectWorkbasketRow = selectedWorkbasketRow;
-        this.workbasketLabel = workbasketLabel;
-        this.uniqueWorkbasket = uniqueWorkbasket;
-
-        this.requestUpdate();
-    }
-
-    /* handleDropdownChange(event, index) {
-        this.selectedValue = event.target.value;
-    }
-
-    ddlChange(e) {
-        console.log(e);
-        const selectedWorkbasket = e.detail.value;
-        this.selectedWBdropdown = selectedWorkbasket;
-        this.selectWorkbasketRow =
-            this.workbasketListData.find(
-                item => item.workbasket === selectedWorkbasket,
-            ) || {};
-
-        console.log(this.selectWorkbasketRow);
-        this.workbasketLabel = this.selectWorkbasketRow.label;
-        this.uniqueWorkbasket = this.selectWorkbasketRow.workbasket;
-    } */
-
-    validateSLAInput() {
-        this.formValidationErrors = {
-            nearSLA: [],
-            breachSLA: [],
-        };
-
-        this.validateField('nearSLA', this.nearSLA);
-        this.validateField('breachSLA', this.BreachSLA);
-
-        const blockingErrors = [
-            'Nearing SLA Cannot be greater than Breached SLA',
-            'Breached SLA Cannot be less than Nearing SLA',
-            'This field is required',
-        ];
-
-        const hasBlockingErrors = Object.values(this.formValidationErrors).some(
-            errors => errors.some(error => blockingErrors.includes(error)),
-        );
-
-        return !hasBlockingErrors;
-    }
-
-    validateField(field, value) {
-        this.formValidationErrors[field] = [];
-        switch (field) {
-            case 'nearSLA':
-                this.validateRequired('nearSLA', value);
-                this.validateNearSLABreachSLA(
-                    field,
-                    this.nearSLA,
-                    this.BreachSLA,
-                );
-                break;
-            case 'breachSLA':
-                this.validateRequired('breachSLA', value);
-                this.validateNearSLABreachSLA(
-                    field,
-                    this.nearSLA,
-                    this.BreachSLA,
-                );
-                break;
-            default:
-                break;
-        }
-
-        this.formValidationErrors = { ...this.formValidationErrors };
-    }
-
-    validateRequired(field, value) {
-        if (!value) {
-            this.formValidationErrors[field].push(`This field is required`);
-        } else if (value === 0) {
-            this.formValidationErrors[field].push(`This field is required`);
-        }
-    }
-
-    validateNearSLABreachSLA(field, nearsla, breachsla) {
-        if (nearsla >= breachsla) {
-            if (field === 'nearSLA') {
-                this.formValidationErrors[field].push(
-                    'Nearing SLA Cannot be greater than Breached SLA',
-                );
-            } else if (field === 'breachSLA') {
-                this.formValidationErrors[field].push(
-                    'Breached SLA Cannot be less than or equal to Nearing SLA',
-                );
-            }
-        }
-    }
-
-    validateRequiredField() {
-        const requiredFields =
-            this.shadowRoot.querySelectorAll('.validate-field');
-        let isValid = true;
-
-        requiredFields.forEach(field => {
-            if (!field.value) {
-                field.setAttribute('error-message', 'This field is required.');
-                isValid = false;
-            } else {
-                field.setAttribute('error-message', '');
-            }
-        });
-        return isValid;
-    }
-
-    handleDeleteCheck(v) {
-        this.deleteCheck = v.detail.checked;
-    }
-
-    async handleSubmit() {
-        try {
-            const slaValid = this.validateSLAInput();
-            const requiredFieldsValid = this.validateRequiredField();
-
-            if (!slaValid || !requiredFieldsValid) {
-                return;
-            }
-
-            this.isLoading = true;
-            const valuesArray = [];
-
-            const WorkBasketName = this.workbasketLabel;
-            const UniqueWorkBasketName = this.uniqueWorkbasket;
-            const pyLabel = this.selectedWBdropdown || this.uniqueWorkbasket;
-            const NearingSLA = this.nearSLA;
-            const BreachedSLA = this.BreachSLA;
-
-            const rowValues = {
-                insName: WorkBasketName, // WORK BASKET NAME IN CAPS LETTER
-                pyLabel: pyLabel, // (PARENT/CHILD) LABLE (e.g. for child ___workbasket name , for parent : workbasket name)
-                workBasketName: UniqueWorkBasketName, // wORK BASKET NAME
-                wbName: pyLabel,
-                nearingSlaTime: NearingSLA,
-                breachedSlaTime: BreachedSLA,
-                applicationName: this.businessFunction,
-                createdBy: this.userPSID,
-                makerName: this.userOpName,
-                makerComments: this.comments,
-                active: !this.deleteCheck ? 'Y' : 'N',
-                id: +this.id,
-            };
-            valuesArray.push(rowValues);
-
-            let query = addUpdateQueueRequest(
-                valuesArray
-                    .map(item => {
-                        const keyValuePairs = Object.entries(item)
-                            .map(([key, value]) => {
-                                if (
-                                    key === 'nearingSlaTime' ||
-                                    key === 'breachedSlaTime' ||
-                                    key === 'id'
-                                ) {
-                                    return `${key}:${value}`;
-                                } else {
-                                    return `${key}:"${value}"`;
-                                }
-                            })
-                            .join(',');
-                        return `{${keyValuePairs}}`;
-                    })
-                    .join(','),
-            );
-
-            let response = await this.graphQLClientService.query(query);
-            const result = await getCommomTransformer(
-                response,
-                'post_addUpdateQueueRequest',
-            );
-
-            if (result != null) {
-                const event = new CustomEvent('sb-add-update-record-result', {
-                    detail: {
-                        open: false,
-                        data: result,
-                        message: 'REQUEST HAS BEEN SUCCESSFULLY UPDATED',
-                    },
-                });
-                this.dispatchEvent(event);
-                this.isLoading = false;
-                this.closeSideSheet();
-            }
-        } catch (error) {
-            console.error('Error loading page data:', error);
-        }
-    }
-    render() {
-        return html`
-            <sc-side-sheet
-                class="sc-side-sheet"
-                label="Add New Product Combination"
-                size="Xl"
-                width="cover"
-                position="right"
-                .open=${this.open}
-                @sc-hide=${this.closeSideSheet}
-            >
-                <div slot="label">${this.title}</div>
-                <div class="d-flex flex-end">
-                    <sc-button
-                        fill=""
-                        icon="plus"
-                        icon-position="left"
-                        size="sm"
-                        @click=${this.handleAddRowClick}
-                    >
-                        Add Record
-                    </sc-button>
-                    <sc-spacer size="lg" vertical=""></sc-spacer>
-                </div>
-                <sc-grid-row>
-                    <sc-grid-column lg="12">
-                        ${this.rows.map(
-                            (row, index) => html`
-                                <div class="add-record-container">
-                                    <div>
-                                        <sc-text-input
-                                            clearable=""
-                                            label="Work Basket Name"
-                                            label-size="xxs"
-                                            border-type="box"
-                                            readonly=""
-                                            value=${this.workbasketLabel ||
-                                            '--'}
-                                        >
-                                        </sc-text-input>
-                                    </div>
-                                    <div>
-                                        <sc-text-input
-                                            clearable=""
-                                            label="Unique Work Basket Name"
-                                            label-size="xxs"
-                                            border-type="box"
-                                            readonly=""
-                                            value=${this.uniqueWorkbasket ||
-                                            '--'}
-                                        >
-                                        </sc-text-input>
-                                    </div>
-
-                                    ${this.isAddRecord
-                                        ? html` <div>
-                                              <sc-dropdown-input
-                                                  class="validate-field"
-                                                  label="Work Basket Name - Unique Name"
-                                                  label-size="xxs"
-                                                  placeholder="Select.."
-                                                  border-type="box"
-                                                  required=""
-                                                  value=${row.selectedWBdropdown ||
-                                                  ''}
-                                                  @sc-select=${e =>
-                                                      this.handleDropdownChange(
-                                                          e,
-                                                          index,
-                                                      )}
-                                                  .data=${this.workBasketList}
-                                              >
-                                              </sc-dropdown-input>
-                                          </div>`
-                                        : html`<div>
-                                              <sc-text-input
-                                                  clearable=""
-                                                  label="Work Basket Name - Unique Name"
-                                                  label-size="xxs"
-                                                  border-type="box"
-                                                  readonly=""
-                                                  value=${row.workBasketAndUniqueName ||
-                                                  '--'}
-                                              >
-                                              </sc-text-input>
-                                          </div> `}
-                                    <div>
-                                        <sc-number-input
-                                            label="Nearing SLA Time (in Minutes)"
-                                            label-size="xxs"
-                                            help-text="Enter number only"
-                                            border-type="box"
-                                            min="1"
-                                            required=""
-                                            value=${row.nearSLA}
-                                            error-message=${this.formValidationErrors?.nearSLA?.join(
-                                                ', ',
-                                            ) || ''}
-                                            @sc-input=${e => {
-                                                this.nearSLA = e.detail.value;
-                                            }}
-                                            @sc-blur=${v =>
-                                                this.validateSLAInput()}
-                                        >
-                                        </sc-number-input>
-                                    </div>
-                                    <div>
-                                        <sc-number-input
-                                            label="Breached SLA Time (in Minutes)"
-                                            id="BreachedSLA"
-                                            label-size="xxs"
-                                            help-text="Enter number only"
-                                            border-type="box"
-                                            min="1"
-                                            required=""
-                                            value=${row.BreachSLA}
-                                            error-message=${this.formValidationErrors?.breachSLA?.join(
-                                                ', ',
-                                            ) || ''}
-                                            @sc-input=${e => {
-                                                this.BreachSLA = e.detail.value;
-                                            }}
-                                            @sc-blur=${v =>
-                                                this.validateSLAInput()}
-                                        >
-                                        </sc-number-input>
-                                    </div>
-                                    ${this.isAddRecord
-                                        ? html` <div>
-                                              <sc-label
-                                                  label="Delete"
-                                                  label-size="xxs"
-                                                  tooltip=""
-                                                  tooltip-placement="top"
-                                              >
-                                              </sc-label>
-                                              <sc-icon-button
-                                                  type="default"
-                                                  size="lg"
-                                                  name="trash--line"
-                                                  no-border=""
-                                                  @click=${() => {
-                                                      this.handleDeleteRowClick(
-                                                          index,
-                                                      );
-                                                  }}
-                                              >
-                                              </sc-icon-button>
-                                          </div>`
-                                        : html`<sc-checkbox
-                                              label="Delete"
-                                              label-size="xxs"
-                                              value=""
-                                              @sc-change="${e =>
-                                                  this.handleDeleteCheck(e)}"
-                                          >
-                                          </sc-checkbox>`}
-                                </div>
-                            `,
-                        )}
-                    </sc-grid-column>
-                </sc-grid-row>
-                <sc-grid-row>
-                    <sc-grid-column lg="12">
-                        <sc-text-input
-                            multiline=""
-                            class="validate-field"
-                            label="Comments"
-                            label-size="xxs"
-                            show-character-count=""
-                            required=""
-                            rows="4"
-                            border-type="box"
-                            max-length="300"
-                            @sc-input=${e => {
-                                this.comments = e.detail.value;
-                            }}
-                        >
-                        </sc-text-input>
-                    </sc-grid-column>
-                </sc-grid-row>
-                <sc-spacer size="sm" vertical=""></sc-spacer>
-                <div class="d-flex">
-                    <sc-button
-                        fill
-                        ?loading=${this.isLoading}
-                        loading-text="...Submitting"
-                        @click=${() => this.handleSubmit()}
-                        >Submit</sc-button
-                    >
-                    <sc-spacer size="xs"></sc-spacer>
-                    <sc-button @click=${this.closeSideSheet}>Cancel</sc-button>
-                    <sc-spacer size="xs" horizontal=""></sc-spacer>
-                </div>
-            </sc-side-sheet>
-        `;
+validateField(field, value, index, comparisonValue) {
+    this.formValidationErrors[index][field] = [];
+    switch (field) {
+        case 'nearSLA':
+            this.validateRequired(field, value, index);
+            this.validateNearSLABreachSLA(field, value, comparisonValue, index);
+            break;
+        case 'breachSLA':
+            this.validateRequired(field, value, index);
+            this.validateNearSLABreachSLA(field, value, comparisonValue, index);
+            break;
+        default:
+            break;
     }
 }
 
-if (!customElements.get('sb-add-update-record')) {
-    customElements.define('sb-add-update-record', AddUpdateRecord);
+validateRequired(field, value, index) {
+    if (!value || value === 0) {
+        this.formValidationErrors[index][field].push('This field is required');
+    }
+}
+
+validateNearSLABreachSLA(field, value, comparisonValue, index) {
+    if (field === 'nearSLA' && value >= comparisonValue) {
+        this.formValidationErrors[index][field].push(
+            'Nearing SLA Cannot be greater than Breached SLA'
+        );
+    } else if (field === 'breachSLA' && value <= comparisonValue) {
+        this.formValidationErrors[index][field].push(
+            'Breached SLA Cannot be less than or equal to Nearing SLA'
+        );
+    }
 }
