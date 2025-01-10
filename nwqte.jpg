@@ -1,96 +1,44 @@
-validateSLAInput(index) {
+validateSLAInput() {
+    let isValid = true;
+
+    // Loop through each row and validate it
+    this.rows.forEach((row, index) => {
+        // Initialize or reset validation errors for each row
         this.formValidationErrors[index] = {
             nearSLA: [],
             breachSLA: [],
         };
 
-        this.validateField('nearSLA', this.nearSLA);
-        this.validateField('breachSLA', this.BreachSLA);
+        const { nearSLA, BreachSLA } = row;
 
-        const blockingErrors = [
-            'Nearing SLA Cannot be greater than Breached SLA',
-            'Breached SLA Cannot be less than Nearing SLA',
-            'This field is required',
-        ];
+        // Validate required fields
+        this.validateRequired('nearSLA', nearSLA, index);
+        this.validateRequired('breachSLA', BreachSLA, index);
 
-        const hasBlockingErrors = Object.values(this.formValidationErrors).some(
-            errors => errors.some(error => blockingErrors.includes(error)),
-        );
-
-        return !hasBlockingErrors;
-    }
-
-    validateSLAInput(index) {
-        if (!this.rows[index]) {
-            console.error(`Row at index ${index} is undefined`);
-            return false;
-        }
-
-        this.formValidationErrors[index] = {
-            nearSLA: [],
-            breachSLA: [],
-        };
-
-        const { nearSLA, BreachSLA } = this.rows[index];
-
-        this.validateField('nearSLA', nearSLA, index, BreachSLA);
-        this.validateField('breachSLA', BreachSLA, index, nearSLA);
-
-        const blockingErrors = [
-            'Nearing SLA Cannot be greater than Breached SLA',
-            'Breached SLA Cannot be less than or equal to Nearing SLA',
-            'This field is required',
-        ];
-
-        const hasBlockingErrors = Object.values(
-            this.formValidationErrors[index],
-        ).some(errors => errors.some(error => blockingErrors.includes(error)));
-
-        return !hasBlockingErrors;
-    }
-
-    validateField(field, value, index, comparisonValue) {
-        this.formValidationErrors[index][field] = [];
-        switch (field) {
-            case 'nearSLA':
-                this.validateRequired(field, value, index);
-                this.validateNearSLABreachSLA(
-                    field,
-                    value,
-                    comparisonValue,
-                    index,
-                );
-                break;
-            case 'breachSLA':
-                this.validateRequired(field, value, index);
-                this.validateNearSLABreachSLA(
-                    field,
-                    value,
-                    comparisonValue,
-                    index,
-                );
-                break;
-            default:
-                break;
-        }
-    }
-
-    validateRequired(field, value, index) {
-        if (!value || value === 0) {
-            this.formValidationErrors[index][field].push(
-                'This field is required',
+        // Validate the business logic: NearSLA >= BreachSLA
+        if (nearSLA >= BreachSLA) {
+            this.formValidationErrors[index].nearSLA.push(
+                'Nearing SLA Cannot be greater than Breached SLA'
+            );
+            this.formValidationErrors[index].breachSLA.push(
+                'Breached SLA Cannot be less than or equal to Nearing SLA'
             );
         }
-    }
 
-    validateNearSLABreachSLA(field, value, comparisonValue, index) {
-        if (field === 'nearSLA' && value >= comparisonValue) {
-            this.formValidationErrors[index][field].push(
-                'Nearing SLA Cannot be greater than Breached SLA',
-            );
-        } else if (field === 'breachSLA' && value <= comparisonValue) {
-            this.formValidationErrors[index][field].push(
-                'Breached SLA Cannot be less than or equal to Nearing SLA',
-            );
+        // Check if there are any errors
+        const hasErrors = this.formValidationErrors[index].nearSLA.length > 0 ||
+            this.formValidationErrors[index].breachSLA.length > 0;
+
+        if (hasErrors) {
+            isValid = false;
         }
+    });
+
+    return isValid;
+}
+
+validateRequired(field, value, index) {
+    if (!value || value === 0) {
+        this.formValidationErrors[index][field].push('This field is required');
     }
+}
