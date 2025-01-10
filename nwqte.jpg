@@ -1,85 +1,134 @@
 validateSLAInput() {
-        this.formValidationErrors = {
+    let hasBlockingErrors = false;
+
+    // Loop through each row and validate individually
+    this.rows.forEach((row, index) => {
+        const nearSLA = row.nearSLA;
+        const breachSLA = row.BreachSLA;
+
+        // Reset errors for this row
+        row.validationErrors = {
             nearSLA: [],
             breachSLA: [],
         };
 
-        this.validateField('nearSLA', this.nearSLA);
-        this.validateField('breachSLA', this.BreachSLA);
+        // Validate each field
+        this.validateField('nearSLA', nearSLA, row);
+        this.validateField('breachSLA', breachSLA, row);
 
+        // Check if there are any blocking errors for the row
         const blockingErrors = [
             'Nearing SLA Cannot be greater than Breached SLA',
-            'Breached SLA Cannot be less than Nearing SLA',
+            'Breached SLA Cannot be less than or equal to Nearing SLA',
             'This field is required',
         ];
 
-        const hasBlockingErrors = Object.values(this.formValidationErrors).some(
-            errors => errors.some(error => blockingErrors.includes(error)),
-        );
-
-        return !hasBlockingErrors;
-    }
-
-    validateField(field, value) {
-        this.formValidationErrors[field] = [];
-        switch (field) {
-            case 'nearSLA':
-                this.validateRequired('nearSLA', value);
-                this.validateNearSLABreachSLA(
-                    field,
-                    this.nearSLA,
-                    this.BreachSLA,
-                );
-                break;
-            case 'breachSLA':
-                this.validateRequired('breachSLA', value);
-                this.validateNearSLABreachSLA(
-                    field,
-                    this.nearSLA,
-                    this.BreachSLA,
-                );
-                break;
-            default:
-                break;
+        // If this row has blocking errors, set hasBlockingErrors to true
+        if (row.validationErrors.nearSLA.some(error => blockingErrors.includes(error)) || 
+            row.validationErrors.breachSLA.some(error => blockingErrors.includes(error))) {
+            hasBlockingErrors = true;
         }
+    });
 
-        this.formValidationErrors = { ...this.formValidationErrors };
+    // Return true if there are no blocking errors for any row
+    return !hasBlockingErrors;
+}
+
+validateField(field, value, row) {
+    row.validationErrors[field] = []; // Reset errors for this field
+
+    switch (field) {
+        case 'nearSLA':
+            this.validateRequired(field, value, row);
+            this.validateNearSLABreachSLA(field, row.nearSLA, row.BreachSLA, row);
+            break;
+        case 'breachSLA':
+            this.validateRequired(field, value, row);
+            this.validateNearSLABreachSLA(field, row.nearSLA, row.BreachSLA, row);
+            break;
+        default:
+            break;
     }
+}
 
-    validateRequired(field, value) {
-        if (!value) {
-            this.formValidationErrors[field].push(`This field is required`);
-        } else if (value === 0) {
-            this.formValidationErrors[field].push(`This field is required`);
-        }
+validateRequired(field, value, row) {
+    if (!value || value === 0) {
+        row.validationErrors[field].push('This field is required');
     }
+}
 
-    validateNearSLABreachSLA(field, nearsla, breachsla) {
-        if (nearsla >= breachsla) {
-            if (field === 'nearSLA') {
-                this.formValidationErrors[field].push(
-                    'Nearing SLA Cannot be greater than Breached SLA',
-                );
-            } else if (field === 'breachSLA') {
-                this.formValidationErrors[field].push(
-                    'Breached SLA Cannot be less than or equal to Nearing SLA',
-                );
-            }
+validateNearSLABreachSLA(field, nearsla, breachsla, row) {
+    if (nearsla >= breachsla) {
+        if (field === 'nearSLA') {
+            row.validationErrors[field].push(
+                'Nearing SLA Cannot be greater than Breached SLA'
+            );
+        } else if (field === 'breachSLA') {
+            row.validationErrors[field].push(
+                'Breached SLA Cannot be less than or equal to Nearing SLA'
+            );
         }
     }
+}
 
-    validateRequiredField() {
-        const requiredFields =
-            this.shadowRoot.querySelectorAll('.validate-field');
-        let isValid = true;
+validateRequiredField() {
+    const requiredFields = this.shadowRoot.querySelectorAll('.validate-field');
+    let isValid = true;
 
-        requiredFields.forEach(field => {
-            if (!field.value) {
-                field.setAttribute('error-message', 'This field is required.');
-                isValid = false;
-            } else {
-                field.setAttribute('error-message', '');
-            }
-        });
-        return isValid;
+    requiredFields.forEach(field => {
+        if (!field.value) {
+            field.setAttribute('error-message', 'This field is required.');
+            isValid = false;
+        } else {
+            field.setAttribute('error-message', '');
+        }
+    });
+    return isValid;
+}
+
+handleSubmit() {
+    try {
+        // Validate all rows
+        const slaValid = this.validateSLAInput();
+        const requiredFieldsValid = this.validateRequiredField();
+
+        // If validation fails, block submission
+        if (!slaValid || !requiredFieldsValid) {
+            console.warn('Form submission blocked due to validation errors.');
+            return;
+        }
+
+        // Proceed with the form submission logic here
+        console.log('Form is valid. Submitting...');
+        this.submitFormData();
+    } catch (error) {
+        console.error('Error during submission:', error);
     }
+}
+
+// Example of row data structure
+rows = [
+    {
+        nearSLA: 10,
+        BreachSLA: 15,
+        validationErrors: {
+            nearSLA: [],
+            breachSLA: [],
+        },
+    },
+    {
+        nearSLA: 12,
+        BreachSLA: 8,
+        validationErrors: {
+            nearSLA: [],
+            breachSLA: [],
+        },
+    },
+    // Additional rows...
+];
+
+// Example of the form submission logic
+submitFormData() {
+    // Perform your submission logic here (e.g., API request)
+    console.log('Form data submitted successfully.');
+}
