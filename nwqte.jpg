@@ -1,18 +1,21 @@
 validateSLAInput(index) {
+    if (!this.rows[index]) {
+        console.error(`Row at index ${index} is undefined`);
+        return false; // Validation fails for an undefined row
+    }
+
     // Reset validation errors for the specific row
     this.formValidationErrors[index] = {
         nearSLA: [],
         breachSLA: [],
     };
 
-    // Get the values for the specific row
     const { nearSLA, BreachSLA } = this.rows[index];
 
     // Perform validation
     this.validateField('nearSLA', nearSLA, index, BreachSLA);
     this.validateField('breachSLA', BreachSLA, index, nearSLA);
 
-    // Check if there are blocking errors for the specific row
     const blockingErrors = [
         'Nearing SLA Cannot be greater than Breached SLA',
         'Breached SLA Cannot be less than or equal to Nearing SLA',
@@ -24,38 +27,4 @@ validateSLAInput(index) {
     );
 
     return !hasBlockingErrors;
-}
-
-validateField(field, value, index, comparisonValue) {
-    this.formValidationErrors[index][field] = [];
-    switch (field) {
-        case 'nearSLA':
-            this.validateRequired(field, value, index);
-            this.validateNearSLABreachSLA(field, value, comparisonValue, index);
-            break;
-        case 'breachSLA':
-            this.validateRequired(field, value, index);
-            this.validateNearSLABreachSLA(field, value, comparisonValue, index);
-            break;
-        default:
-            break;
-    }
-}
-
-validateRequired(field, value, index) {
-    if (!value || value === 0) {
-        this.formValidationErrors[index][field].push('This field is required');
-    }
-}
-
-validateNearSLABreachSLA(field, value, comparisonValue, index) {
-    if (field === 'nearSLA' && value >= comparisonValue) {
-        this.formValidationErrors[index][field].push(
-            'Nearing SLA Cannot be greater than Breached SLA'
-        );
-    } else if (field === 'breachSLA' && value <= comparisonValue) {
-        this.formValidationErrors[index][field].push(
-            'Breached SLA Cannot be less than or equal to Nearing SLA'
-        );
-    }
 }
