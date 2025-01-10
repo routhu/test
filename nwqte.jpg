@@ -1,27 +1,17 @@
-handleDropdownChange(event, index) {
-    const selectedValue = event.target.value;
+    handleDropdownChange(event, index) {
+        this.selectedValue = event.target.value;
+    }
 
-    // Find the selected workbasket row from the dropdown data
-    const selectWorkbasketRow = this.workBasketList.find(
-        (item) => item.workbasket === selectedValue
-    ) || {};
+    ddlChange(e) {
+        console.log(e);
+        const selectedWorkbasket = e.detail.value;
+        this.selectedWBdropdown = selectedWorkbasket;
+        this.selectWorkbasketRow =
+            this.workbasketListData.find(
+                item => item.workbasket === selectedWorkbasket,
+            ) || {};
 
-    // Extract workbasket label and unique name
-    const workbasketLabel = selectWorkbasketRow.label || '';
-    const uniqueWorkbasket = selectWorkbasketRow.workbasket || '';
-
-    // Update the specific row with the selected dropdown value and related data
-    this.rows = this.rows.map((row, i) =>
-        i === index
-            ? {
-                  ...row,
-                  selectedWBdropdown: selectedValue,
-                  workbasketLabel: workbasketLabel,
-                  uniqueWorkbasket: uniqueWorkbasket,
-              }
-            : row
-    );
-
-    // Trigger re-render
-    this.requestUpdate();
-}
+        console.log(this.selectWorkbasketRow);
+        this.workbasketLabel = this.selectWorkbasketRow.label;
+        this.uniqueWorkbasket = this.selectWorkbasketRow.workbasket;
+    }
