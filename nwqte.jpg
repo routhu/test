@@ -1,1 +1,197 @@
 
+import { SbElement } from '@scdevkit/service-bench-core';
+import ScGridStyle from '@scdevkit/webkit/styles/ScGridStyle.js';
+import { css, html } from 'lit';
+import { classMap } from 'lit/directives/class-map.js';
+import GraphQLClientService from '../../../../../services/grapghql-service.js';
+// import { slaHistory } from '../queries.js';
+import ProductStyles from '../../styles.js';
+import { getCommomTransformer } from '../../transformer.js';
+import { validateRequiredField } from '../../validations.js';
+import {
+    getProductGroupDropdownData,
+    getProductsServicesDropdownData,
+    getQueryTypeDropdownData,
+    getSubProductGroupDropdownData,
+} from '../queries.js';
+
+export default class AddRecord extends SbElement {
+    static styles = [
+        this.styles,
+        css`
+            ${ScGridStyle} ${ProductStyles}
+        `,
+    ];
+
+    static graphQLClientService;
+
+    static properties = {
+        rows: { type: Array },
+        productGroupData: { type: Array },
+        subProductGroupData: { type: Array },
+        productsServicesData: { type: Array },
+        queryTypeData: { type: Array },
+    };
+
+    constructor() {
+        super();
+        this.rows = [
+            {
+                productGroup: '',
+                productSubGroup: '',
+                productsServices: '',
+                queryType: '',
+                selfServiceAvailability: '',
+                message: '',
+            },
+        ];
+        this.productGroupData = [];
+        this.subProductGroupData = [];
+        this.productsServicesData = [];
+        this.queryTypeData = [];
+
+        try {
+            this.graphQLClientService = new GraphQLClientService(this);
+        } catch (error) {
+            console.log({ error });
+        }
+    }
+
+    connectedCallback() {
+        super.connectedCallback();
+        this.loadProductGroupDropdown('');
+    }
+
+    disconnectedCallback() {
+        super.disconnectedCallback();
+    }
+
+    handleAddRowClick() {
+        this.rows = [
+            ...this.rows,
+            {
+                productGroup: '',
+                productSubGroup: '',
+                productsServices: '',
+                queryType: '',
+                selfServiceAvailability: '',
+                message: '',
+            },
+        ];
+    }
+
+    handleDeleteRowClick(index) {
+        if (this.rows.length > 1) {
+            this.rows.splice(index, 1);
+            this.rows = [...this.rows];
+        }
+    }
+
+    async loadProductGroupDropdown(val) {
+        try {
+            const params = { searchString: val };
+            const query = getProductGroupDropdownData(params);
+            const response = await this.graphQLClientService.query(query);
+            const result = await getCommomTransformer(
+                response,
+                'GET_Admin_Sr_PickList_Configuration_getProductDetails',
+            );
+
+            if (result) {
+                this.productGroupData = result;
+            }
+        } catch (error) {
+            console.error('Error loading product group dropdown data:', error);
+        }
+    }
+
+    async loadSubProductGroupDropdown(val) {
+        try {
+            const params = { searchString: val };
+            const query = getSubProductGroupDropdownData(params);
+            const response = await this.graphQLClientService.query(query);
+            const result = await getCommomTransformer(
+                response,
+                'GET_Admin_Sr_PickList_Configuration_getSubGroupDetails',
+            );
+
+            if (result) {
+                this.subProductGroupData = result;
+            }
+        } catch (error) {
+            console.error(
+                'Error loading sub product group dropdown data:',
+                error,
+            );
+        }
+    }
+
+    async loadProductsServicesDropdown(val) {
+        try {
+            const params = { searchString: val };
+            const query = getProductsServicesDropdownData(params);
+            const response = await this.graphQLClientService.query(query);
+            const result = await getCommomTransformer(
+                response,
+                'GET_Admin_Sr_PickList_Configuration_getPrdSrvcDetails',
+            );
+
+            if (result != null) {
+                this.productsServicesData = result;
+            }
+        } catch (error) {
+            console.error(
+                'Error loading products services dropdwon data:',
+                error,
+            );
+        }
+    }
+
+    async loadQueryTypeDropdown(val) {
+        try {
+            const params = { searchString: val };
+            const query = getQueryTypeDropdownData(params);
+            const response = await this.graphQLClientService.query(query);
+            const result = await getCommomTransformer(
+                response,
+                'GET_Admin_Sr_PickList_Configuration_getQueryTypeDetails',
+            );
+
+            if (result != null) {
+                this.queryTypeData = result;
+            }
+        } catch (error) {
+            console.error('Error loading query type dropdown data:', error);
+        }
+    }
+
+    handleDropdownChange(index, field, event) {
+        this.rows[index][field] = event.detail.value;
+        this.requestUpdate();
+    }
+
+    handleDropdownData(index, field, event) {
+        const { value } = event.detail;
+
+        if (value.length > 2) {
+            if (field === 'productGroup') {
+                this.productGroupData = [];
+                this.loadProductGroupDropdown(value);
+            } else if (field === 'productSubGroup') {
+                this.subProductGroupData = [];
+                this.loadSubProductGroupDropdown(value);
+            } else if (field === 'productsServices') {
+                this.productsServicesData = [];
+                this.loadProductsServicesDropdown(value);
+            } else if (field === 'queryType') {
+                this.queryTypeData = [];
+                this.loadQueryTypeDropdown(value);
+            }
+        }
+        this.requestUpdate();
+    }
+
+    handleInputChange(index, field, event) {
+        this.rows[index][field] = event.detail.value;
+        this.requestUpdate();
+    }
