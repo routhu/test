@@ -1,1 +1,305 @@
+import { createContext } from '@scdevkit/data';
+import { SbElement, contexts as nav } from '@scdevkit/service-bench-core';
+import ScGridStyle from '@scdevkit/webkit/styles/ScGridStyle.js';
+import dayjs from 'dayjs/esm';
+import { css, html } from 'lit';
+import GraphQLClientService from '../../../../services/grapghql-service.js';
+import UserService from '../../../../services/user-service.js';
+import ProductStyles from '../styles.js';
+import { convertUTCToLocal, getCommonTransformer } from '../transformer.js';
+import './components/AddRecord.js';
+import './components/DeleteRecord.js';
+import './components/FilterTable.js';
+import './components/ImportFile.js';
+import {
+    getAllProducts,
+    getLastUpdatedDate,
+    getProductDetails,
+    getProductGroupDropdownData,
+    getProductsServicesDropdownData,
+    getQueryTypeDropdownData,
+    getSubProductGroupDropdownData,
+} from './queries.js';
 
+const navigationContext = createContext(nav.NAVIGATION);
+
+export class ProductConfiguration extends SbElement {
+    static styles = [
+        this.styles,
+        css`
+            ${ScGridStyle}
+            ${ProductStyles}
+        `,
+    ];
+
+    _navigationContextConsumer = navigationContext.createConsumer(this);
+
+    static userService;
+
+    static graphQLClientService;
+
+    static properties = {
+        userPSID: { type: String, state: true },
+        businessFunction: { type: String },
+        userOpName: { type: String, state: true },
+        productGroupFilter: { type: String },
+        subProductGroupFilter: { type: String },
+        productsServicesFilter: { type: String },
+        queryTypeFilter: { type: String },
+        selfServiceAvailabilityFilter: { type: String },
+        productGroup: { type: String },
+        subProductGroup: { type: String },
+        productsServices: { type: String },
+        queryType: { type: String },
+        updatedOn: { type: String },
+        updatedBy: { type: String },
+        picklistVal: { type: String },
+        snackbarMessage: { type: String },
+        snackbarType: { type: String },
+        sortBy: { type: String },
+        sortType: { type: String },
+        productGroupData: { type: Array },
+        subProductGroupData: { type: Array },
+        productsServicesData: { type: Array },
+        queryTypeData: { type: Array },
+        productOverview: { type: Array },
+        productDetails: { type: Array },
+        rowData: { type: Array },
+        exportProductData: { type: Array },
+        totalRecordCount: { type: Number },
+        isProductFilter: { type: Boolean },
+        isImportFile: { type: Boolean },
+        isAddRecord: { type: Boolean },
+        isDataLoaded: { type: Boolean },
+        isDisabled: { type: Boolean },
+        showSnackbar: { type: Boolean },
+        isDeleteRecord: { type: Boolean },
+    };
+
+    constructor() {
+        super();
+        this.userPSID = '';
+        this.businessFunction = '';
+        this.userOpName = '';
+        this.productGroupFilter = '';
+        this.subProductGroupFilter = '';
+        this.productsServicesFilter = '';
+        this.queryTypeFilter = '';
+        this.selfServiceAvailabilityFilter = '';
+        this.productGroup = '';
+        this.subProductGroup = '';
+        this.productsServices = '';
+        this.queryType = '';
+        this.updatedOn = '';
+        this.updatedBy = '';
+        this.picklistVal = '';
+        this.snackbarMessage = '';
+        this.snackbarType = '';
+        this.sortBy = '';
+        this.sortType = '';
+        this.totalRecordCount = 0;
+        this.productGroupData = [];
+        this.subProductGroupData = [];
+        this.productsServicesData = [];
+        this.queryTypeData = [];
+        this.productOverview = [];
+        this.productDetails = [];
+        this.rowData = [];
+        this.exportProductData = [];
+        this.isAddRecord = false;
+        this.OpenActionSheet = false;
+        this.isProductFilter = false;
+        this.isImportFile = false;
+        this.isDataLoaded = false;
+        this.isDisabled = false;
+        this.showSnackbar = false;
+        this.isDeleteRecord = false;
+
+        try {
+            this.userService = new UserService(this);
+            this.graphQLClientService = new GraphQLClientService(this);
+        } catch (error) {
+            console.log({ error });
+        }
+    }
+
+    connectedCallback() {
+        super.connectedCallback();
+        sessionStorage.setItem('pickListSourcePage', 'Product Changes');
+        const userObj = this.userService.userContext;
+        this.userPSID = userObj.id;
+        this.userOpName = `${userObj.firstName} ${userObj.lastName}`;
+        this.businessFunction = sessionStorage.getItem('businessFunction');
+        this.caseOrgCountry = sessionStorage.getItem('originatingCountry');
+        this.picklistVal = 'P';
+        this.sortBy = 'product';
+        this.sortType = 'desc';
+        this.conf = [
+            {
+                property: 'product',
+                header: 'Product Group',
+                sort: false,
+                columnStyle: '',
+            },
+            {
+                property: 'subProduct',
+                header: 'Sub Product Group',
+                sort: true,
+                columnStyle: '',
+            },
+            {
+                property: 'productServices',
+                header: 'Products & Services',
+                sort: true,
+                columnStyle: '',
+            },
+            {
+                property: 'queryType',
+                header: 'Query Type',
+                sort: true,
+                columnStyle: '',
+            },
+            {
+                property: 'selfservice',
+                header: 'Self Service Availability',
+                sort: true,
+                columnStyle: '',
+            },
+            {
+                property: 'message',
+                header: 'Message',
+                sort: false,
+                columnStyle: '',
+            },
+            {
+                property: 'export',
+                header: '',
+                sort: false,
+                cell: (value, properties) => html`
+                    <sc-icon-button
+                        size="md"
+                        name="trash-alt--line"
+                        no-border=""
+                        ?disabled=${this.isDisabled}
+                        @click=${() => this.deleteRecord(properties)}
+                    >
+                    </sc-icon-button>
+                `,
+            },
+        ];
+        this.loadPageData();
+    }
+async handleDownloadProductData() {
+        try {
+            const params = {
+                userId: this.userPSID,
+                businessFunction: this.businessFunction,
+                pageNo: 1,
+                pageLimit: this.totalRecordCount,
+                totalRecordCount: this.totalRecordCount,
+                sortBy: this.sortBy,
+                sortType: this.sortType,
+                product: this.productGroup,
+                subProduct: this.subProductGroup,
+                productServices: this.productsServices,
+                queryType: this.queryType,
+                recordType: this.picklistVal,
+            };
+
+            this.isDataLoaded = false;
+            const query = getProductDetails(params);
+
+            const response = await this.graphQLClientService.query(query);
+            const result = await getCommonTransformer(
+                response,
+                'GET_Admin_Sr_PickList_Configuration_getProductSearchResult',
+            );
+
+            if (result != null) {
+                const { data } = result;
+                this.totalRecordCount = result.totalRecordCount;
+                this.isDataLoaded = true;
+
+                if (this.picklistVal === 'I') {
+                    this.isDisabled = true;
+                } else {
+                    this.isDisabled = false;
+                }
+
+                this.exportProductData = data.map(item => ({
+                    id: item.productId,
+                    product: item.groupName,
+                    subProduct: item.subGroup,
+                    productServices: item.name,
+                    queryType: item.queryType,
+                    selfservice: item.selfserviceAvailability,
+                    message: item.message,
+                }));
+
+                this.exportResult(this.exportProductData);
+            }
+        } catch (error) {
+            console.error('Error loading page data:', error);
+        }
+    }
+
+static download = (data, filename = 'report.pdf') => {
+        // Create a Blob with the CSV data and type
+        const blob = new Blob([data], { type: 'text/csv' });
+
+        // Create a URL for the Blob
+        const url = URL.createObjectURL(blob);
+
+        // Create an anchor tag for downloading
+        const a = document.createElement('a');
+
+        // Set the URL and download attribute of the anchor tag
+        a.href = url;
+        a.download = filename;
+
+        // Trigger the download by clicking the anchor tag
+        a.click();
+    };
+
+    exportResult(data) {
+        const dataToExport = data.map(items => ({
+            ...items,
+            timeCreated: convertUTCToLocal(items.timeCreated).toString(),
+        }));
+
+        let output = this.conf
+            .filter(item => item.property)
+            .map(item => `"${item.header}"`)
+            .join(',');
+
+        dataToExport.forEach(entry => {
+            const entryOutput = this.conf
+                .filter(item => item.property)
+                .map(({ property }) => this._get(entry, property))
+                .map(
+                    value =>
+                        `"${
+                            typeof value === 'string'
+                                ? value.replaceAll('"', '""')
+                                : JSON.stringify(value).replaceAll('"', '""')
+                        }"`,
+                )
+                .join(',');
+            output = `${output}\n${entryOutput}`;
+        });
+
+        this.download(
+            output,
+            `${'Product_Data'}T${dayjs().format('YYYYMMDD_HHmmss')}.csv`,
+        );
+    }
+
+    static _get(object, path, defval = null) {
+        const objectPath = typeof path === 'string' ? path.split('.') : null;
+        return !objectPath
+            ? object
+            : objectPath.reduce(
+                  (xs, x) => (xs && xs[x] ? xs[x] : defval),
+                  object,
+              );
+    }
