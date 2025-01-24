@@ -438,3 +438,8 @@ if (!customElements.get('sb-import-product-config-file')) {
         ImportProductConfigFile,
     );
 }
+
+Expected to return a value at the end of async method 'handelFileupload'.eslintconsistent-return
+Expected 'this' to be used by class async method 'docFormUploadRestApi'.eslintclass-methods-use-this
+Expected 'this' to be used by class method 'getFileExtension'.eslintclass-methods-use-this
+
